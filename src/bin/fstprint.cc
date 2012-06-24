@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
   usage += " [binary.fst [text.fst]]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
@@ -56,14 +56,14 @@ int main(int argc, char **argv) {
   s::FstClass *fst = s::FstClass::Read(in_name);
   if (!fst) return 1;
 
-  ostream *ostrm = &std::cout;
+  ostream *ostrm = &cout;
   string dest = "standard output";
   if (argc == 3) {
     dest = argv[2];
     ostrm = new fst::ofstream(argv[2]);
     if (!*ostrm) {
       LOG(ERROR) << argv[0] << ": Open failed, file = " << argv[2];
-      return 0;
+      return 1;
     }
   }
   ostrm->precision(9);
@@ -90,8 +90,8 @@ int main(int argc, char **argv) {
   if (!osyms && !FLAGS_numeric)
     osyms = fst->OutputSymbols();
 
-  s::PrintFst(*fst, isyms, osyms, ssyms, FLAGS_acceptor, FLAGS_show_weight_one,
-              ostrm, dest);
+  s::PrintFst(*fst, *ostrm, dest, isyms, osyms, ssyms,
+              FLAGS_acceptor, FLAGS_show_weight_one);
 
   if (isyms && !FLAGS_save_isymbols.empty())
     isyms->WriteText(FLAGS_save_isymbols);
@@ -99,7 +99,7 @@ int main(int argc, char **argv) {
   if (osyms && !FLAGS_save_osymbols.empty())
     osyms->WriteText(FLAGS_save_osymbols);
 
-  if (ostrm != &std::cout)
+  if (ostrm != &cout)
     delete ostrm;
   return 0;
 }

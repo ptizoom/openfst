@@ -45,10 +45,9 @@ int main(int argc, char **argv) {
   using fst::SymbolTable;
   using fst::script::FstClass;
   using fst::script::MutableFstClass;
-  using fst::script::VectorFstClass;
 
-  string usage = "Relabel the input and/or the output labels of the Fst.\n";
-  usage += " Usage: ";
+  string usage = "Relabels the input and/or the output labels of the FST.\n\n"
+      "  Usage: ";
   usage += argv[0];
   usage += " [in.fst [out.fst]]\n";
   usage += " Using SymbolTables flags:\n";
@@ -59,49 +58,39 @@ int main(int argc, char **argv) {
   usage += "  -relabel_opairs   opairs.txts\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
   }
 
-  string in_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
+  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
   string out_name = argc > 2 ? argv[2] : "";
 
-  FstClass *ifst = FstClass::Read(in_name);
-  if (!ifst) {
-    return 0;
-  }
-
-  MutableFstClass *ofst = 0;
-  if (ifst->Properties(fst::kMutable, false)) {
-    ofst = static_cast<MutableFstClass *>(ifst);
-  } else {
-    ofst = new VectorFstClass(*ifst);
-    delete ifst;
-  }
+  MutableFstClass *fst = MutableFstClass::Read(in_name, true);
+  if (!fst) return 1;
 
   // Relabel with symbol tables
   if (!FLAGS_relabel_isymbols.empty() || !FLAGS_relabel_osymbols.empty()) {
-    bool attach_new_isymbols = (ifst->InputSymbols() != 0);
+    bool attach_new_isymbols = (fst->InputSymbols() != 0);
     const SymbolTable* old_isymbols = FLAGS_isymbols.empty()
-        ? ifst->InputSymbols()
+        ? fst->InputSymbols()
         : SymbolTable::ReadText(FLAGS_isymbols, FLAGS_allow_negative_labels);
     const SymbolTable* relabel_isymbols = FLAGS_relabel_isymbols.empty()
         ? NULL
         : SymbolTable::ReadText(FLAGS_relabel_isymbols,
                                 FLAGS_allow_negative_labels);
 
-    bool attach_new_osymbols = (ofst->OutputSymbols() != 0);
+    bool attach_new_osymbols = (fst->OutputSymbols() != 0);
     const SymbolTable* old_osymbols = FLAGS_osymbols.empty()
-        ? ofst->OutputSymbols()
+        ? fst->OutputSymbols()
         : SymbolTable::ReadText(FLAGS_osymbols, FLAGS_allow_negative_labels);
     const SymbolTable* relabel_osymbols = FLAGS_relabel_osymbols.empty()
         ? NULL
         : SymbolTable::ReadText(FLAGS_relabel_osymbols,
                                 FLAGS_allow_negative_labels);
 
-    s::Relabel(ofst,
+    s::Relabel(fst,
                old_isymbols, relabel_isymbols, attach_new_isymbols,
                old_osymbols, relabel_osymbols, attach_new_osymbols);
   } else {
@@ -109,17 +98,20 @@ int main(int argc, char **argv) {
     typedef int64 Label;
     vector<pair<Label, Label> > ipairs;
     vector<pair<Label, Label> > opairs;
-    if (!FLAGS_relabel_ipairs.empty())
-      fst::ReadLabelPairs(FLAGS_relabel_ipairs, &ipairs,
-                              FLAGS_allow_negative_labels);
-    if (!FLAGS_relabel_opairs.empty())
-      fst::ReadLabelPairs(FLAGS_relabel_opairs, &opairs,
-                              FLAGS_allow_negative_labels);
-
-    s::Relabel(ofst, ipairs, opairs);
+    if (!FLAGS_relabel_ipairs.empty()) {
+      if(!fst::ReadLabelPairs(FLAGS_relabel_ipairs, &ipairs,
+                                  FLAGS_allow_negative_labels))
+        return 1;
+    }
+    if (!FLAGS_relabel_opairs.empty()) {
+      if (!fst::ReadLabelPairs(FLAGS_relabel_opairs, &opairs,
+                                   FLAGS_allow_negative_labels))
+        return 1;
+    }
+    s::Relabel(fst, ipairs, opairs);
   }
 
-  ofst->Write(out_name);
+  fst->Write(out_name);
 
   return 0;
 }

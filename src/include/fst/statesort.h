@@ -27,6 +27,7 @@ using std::vector;
 
 #include <fst/mutable-fst.h>
 
+
 namespace fst {
 
 // Sorts the input states of an FST, modifying it. ORDER[i] gives the
@@ -39,7 +40,11 @@ void StateSort(MutableFst<Arc> *fst,
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Weight Weight;
 
-  CHECK_EQ(order.size(), fst->NumStates());
+  if (order.size() != fst->NumStates()) {
+    FSTERROR() << "StateSort: bad order vector size: " << order.size();
+    fst->SetProperties(kError, kError);
+    return;
+  }
 
   if (fst->Start() == kNoStateId)
     return;

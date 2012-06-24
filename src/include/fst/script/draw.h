@@ -22,6 +22,7 @@
 #include <fst/script/draw-impl.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 namespace fst {
 namespace script {
@@ -54,7 +55,7 @@ struct FstDrawerArgs {
                 const SymbolTable *osyms,
                 const SymbolTable *ssyms,
                 bool accep,
-                string title,
+                const string &title,
                 float width,
                 float height,
                 bool portrait,
@@ -92,7 +93,7 @@ void DrawFst(const FstClass &fst,
              const SymbolTable *osyms,
              const SymbolTable *ssyms,
              bool accep,
-             string title,
+             const string &title,
              float width,
              float height,
              bool portrait,

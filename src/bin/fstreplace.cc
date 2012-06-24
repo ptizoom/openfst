@@ -25,13 +25,13 @@ int main(int argc, char **argv) {
   using fst::script::FstClass;
   using fst::script::VectorFstClass;
 
-  string usage = "Recursively replace Fst arcs with other Fst(s).\n";
-  usage += " Usage: ";
+  string usage = "Recursively replaces FST arcs with other FST(s).\n\n"
+      "  Usage: ";
   usage += argv[0];
   usage += " root.fst rootlabel [rule1.fst label1 ...] [out.fst]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc < 4) {
     ShowUsage();
     return 1;
@@ -46,13 +46,13 @@ int main(int argc, char **argv) {
   typedef int64 Label;
   typedef pair<Label, const s::FstClass* > FstTuple;
   vector<FstTuple> fst_tuples;
-  Label root = atoi(argv[2]);
+  Label root = atoll(argv[2]);
   fst_tuples.push_back(make_pair(root, ifst));
 
   for (size_t i = 3; i < argc - 1; i += 2) {
     ifst = s::FstClass::Read(argv[i]);
     if (!ifst) return 1;
-    Label lab = atoi(argv[i + 1]);
+    Label lab = atoll(argv[i + 1]);
     fst_tuples.push_back(make_pair(lab, ifst));
   }
 

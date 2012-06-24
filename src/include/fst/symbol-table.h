@@ -29,9 +29,12 @@ using std::pair; using std::make_pair;
 #include <vector>
 using std::vector;
 
+
 #include <fst/compat.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
 
 #include <map>
 
@@ -112,14 +115,14 @@ class SymbolTableImpl {
 
   //
   // Return the key associated with the symbol. If the symbol
-  // does not exists, return -1.
+  // does not exists, return SymbolTable::kNoSymbol.
   int64 Find(const string& symbol) const {
     return Find(symbol.c_str());
   }
 
   //
   // Return the key associated with the symbol. If the symbol
-  // does not exists, return -1.
+  // does not exists, return SymbolTable::kNoSymbol.
   int64 Find(const char* symbol) const {
     map<const char *, int64, StrCmp>::const_iterator it =
         symbol_map_.find(symbol);
@@ -147,13 +150,11 @@ class SymbolTableImpl {
   }
 
   string CheckSum() const {
-    MutexLock check_sum_lock(&check_sum_mutex_);
     MaybeRecomputeCheckSum();
     return check_sum_string_;
   }
 
   string LabeledCheckSum() const {
-    MutexLock check_sum_lock(&check_sum_mutex_);
     MaybeRecomputeCheckSum();
     return labeled_check_sum_string_;
   }
@@ -169,6 +170,8 @@ class SymbolTableImpl {
  private:
   // Recomputes the checksums (both of them) if we've had changes since the last
   // computation (i.e., if check_sum_finalized_ is false).
+  // Takes ~2.5 microseconds (dbg) or ~230 nanoseconds (opt) on a 2.67GHz Xeon
+  // if the checksum is up-to-date (requiring no recomputation).
   void MaybeRecomputeCheckSum() const;
 
   struct StrCmp {
@@ -186,8 +189,6 @@ class SymbolTableImpl {
 
   mutable RefCounter ref_count_;
   mutable bool check_sum_finalized_;
-  mutable CheckSummer check_sum_;
-  mutable CheckSummer labeled_check_sum_;
   mutable string check_sum_string_;
   mutable string labeled_check_sum_string_;
   mutable Mutex check_sum_mutex_;
@@ -210,6 +211,9 @@ class SymbolTable {
  public:
   static const int64 kNoSymbol = -1;
 
+  // Construct symbol table with an unspecified name.
+  SymbolTable() : impl_(new SymbolTableImpl("<unspecified>")) {}
+
   // Construct symbol table with a unique name.
   SymbolTable(const string& name) : impl_(new SymbolTableImpl(name)) {}
 
@@ -222,6 +226,15 @@ class SymbolTable {
   // implementation.
   virtual ~SymbolTable() {
     if (!impl_->DecrRefCount()) delete impl_;
+  }
+
+  // Copys the implemenation from one symbol table to another.
+  void operator=(const SymbolTable &st) {
+    if (impl_ != st.impl_) {
+      st.impl_->IncrRefCount();
+      if (!impl_->DecrRefCount()) delete impl_;
+      impl_ = st.impl_;
+    }
   }
 
   // Read an ascii representation of the symbol table from an istream. Pass a
@@ -315,7 +328,8 @@ class SymbolTable {
 
   // Return the label-agnostic MD5 check-sum for this table.  All new symbols
   // added to the table will result in an updated checksum.
-  virtual string CheckSum() const ATTRIBUTE_DEPRECATED {
+  // DEPRECATED.
+  virtual string CheckSum() const {
     return impl_->CheckSum();
   }
 
@@ -357,13 +371,13 @@ class SymbolTable {
   }
 
   // Return the key associated with the symbol. If the symbol
-  // does not exists, log error and  return -1
+  // does not exists, log error and  return SymbolTable::kNoSymbol
   virtual int64 Find(const string& symbol) const {
     return impl_->Find(symbol);
   }
 
   // Return the key associated with the symbol. If the symbol
-  // does not exists, log error and  return -1
+  // does not exists, log error and  return SymbolTable::kNoSymbol
   virtual int64 Find(const char* symbol) const {
     return impl_->Find(symbol);
   }
@@ -401,8 +415,6 @@ class SymbolTable {
 
  private:
   SymbolTableImpl* impl_;
-
-  void operator=(const SymbolTable &table);  // disallow
 };
 
 
@@ -498,6 +510,20 @@ SymbolTable *RelabelSymbolTable(const SymbolTable *table,
 
   return new_table;
 }
+
+// Symbol Table Serialization
+inline void SymbolTableToString(const SymbolTable *table, string *result) {
+  ostringstream ostrm;
+  table->Write(ostrm);
+  *result = ostrm.str();
+}
+
+inline SymbolTable *StringToSymbolTable(const string &s) {
+  istringstream istrm(s);
+  return SymbolTable::Read(istrm, SymbolTableReadOptions());
+}
+
+
 
 }  // namespace fst
 

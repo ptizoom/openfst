@@ -23,10 +23,14 @@
 #ifndef FST_LIB_MUTABLE_FST_H__
 #define FST_LIB_MUTABLE_FST_H__
 
+#include <stddef.h>
+#include <sys/types.h>
 #include <string>
 #include <vector>
 using std::vector;
+
 #include <fst/expanded-fst.h>
+
 
 namespace fst {
 
@@ -50,6 +54,7 @@ class MutableFst : public ExpandedFst<A> {
   virtual void SetFinal(StateId, Weight) = 0;   // Set a state's final weight
   virtual void SetProperties(uint64 props,
                              uint64 mask) = 0;  // Set property bits wrt mask
+
   virtual StateId AddState() = 0;               // Add a state, return its ID
   virtual void AddArc(StateId, const A &arc) = 0;   // Add an arc to state
 
@@ -57,6 +62,9 @@ class MutableFst : public ExpandedFst<A> {
   virtual void DeleteStates() = 0;              // Delete all states
   virtual void DeleteArcs(StateId, size_t n) = 0;  // Delete some arcs at state
   virtual void DeleteArcs(StateId) = 0;         // Delete all arcs at state
+
+  virtual void ReserveStates(StateId n) { }  // Optional, best effort only.
+  virtual void ReserveArcs(StateId s, size_t n) { }  // Optional, Best effort.
 
   // Return input label symbol table; return NULL if not specified
   virtual const SymbolTable* InputSymbols() const = 0;
@@ -105,18 +113,36 @@ class MutableFst : public ExpandedFst<A> {
     return static_cast<MutableFst<A> *>(fst);
   }
 
-  // Read an ExpandedFst from a file; return NULL on error.
-  // Empty filename reads from standard input.
-  static MutableFst<A> *Read(const string &filename) {
-    if (!filename.empty()) {
-      ifstream strm(filename.c_str(), ifstream::in | ifstream::binary);
-      if (!strm) {
-        LOG(ERROR) << "MutableFst::Read: Can't open file: " << filename;
-        return 0;
+  // Read a MutableFst from a file; return NULL on error.
+  // Empty filename reads from standard input. If 'convert' is true,
+  // convert to a mutable FST of type 'convert_type' if file is
+  // a non-mutable FST.
+  static MutableFst<A> *Read(const string &filename, bool convert = false,
+                             const string &convert_type = "vector") {
+    if (convert == false) {
+      if (!filename.empty()) {
+        ifstream strm(filename.c_str(), ifstream::in | ifstream::binary);
+        if (!strm) {
+          LOG(ERROR) << "MutableFst::Read: Can't open file: " << filename;
+          return 0;
+        }
+        return Read(strm, FstReadOptions(filename));
+      } else {
+        return Read(cin, FstReadOptions("standard input"));
       }
-      return Read(strm, FstReadOptions(filename));
-    } else {
-      return Read(std::cin, FstReadOptions("standard input"));
+    } else {  // Converts to 'convert_type' if not mutable.
+      Fst<A> *ifst = Fst<A>::Read(filename);
+      if (!ifst) return 0;
+      if (ifst->Properties(kMutable, false)) {
+        return static_cast<MutableFst *>(ifst);
+      } else {
+        Fst<A> *ofst = Convert(*ifst, convert_type);
+        delete ifst;
+        if (!ofst) return 0;
+        if (!ofst->Properties(kMutable, false))
+          LOG(ERROR) << "MutableFst: bad convert type: " << convert_type;
+        return static_cast<MutableFst *>(ofst);
+      }
     }
   }
 
@@ -187,6 +213,8 @@ class MutableArcIterator {
 };
 
 
+namespace internal {
+
 //  MutableFst<A> case - abstract methods.
 template <class A> inline
 typename A::Weight Final(const MutableFst<A> &fst, typename A::StateId s) {
@@ -207,6 +235,8 @@ template <class A> inline
 ssize_t NumOutputEpsilons(const MutableFst<A> &fst, typename A::StateId s) {
   return fst.NumOutputEpsilons(s);
 }
+
+}  // namespace internal
 
 
 // A useful alias when using StdArc.
@@ -237,6 +267,11 @@ class ImplToMutableFst : public ImplToExpandedFst<I, F> {
   }
 
   virtual void SetProperties(uint64 props, uint64 mask) {
+    // Can skip mutate check if extrinsic properties don't change,
+    // since it is then safe to update all (shallow) copies
+    uint64 exprops = kExtrinsicProperties & mask;
+    if (GetImpl()->Properties(exprops) != (props & exprops))
+      MutateCheck();
     GetImpl()->SetProperties(props, mask);
   }
 
@@ -268,6 +303,16 @@ class ImplToMutableFst : public ImplToExpandedFst<I, F> {
   virtual void DeleteArcs(StateId s) {
     MutateCheck();
     GetImpl()->DeleteArcs(s);
+  }
+
+  virtual void ReserveStates(StateId s) {
+    MutateCheck();
+    GetImpl()->ReserveStates(s);
+  }
+
+  virtual void ReserveArcs(StateId s, size_t n) {
+    MutateCheck();
+    GetImpl()->ReserveArcs(s, n);
   }
 
   virtual const SymbolTable* InputSymbols() const {
@@ -321,12 +366,13 @@ class ImplToMutableFst : public ImplToExpandedFst<I, F> {
   ImplToMutableFst<I, F>  &operator=(const ImplToMutableFst<I, F> &fst);
 
   ImplToMutableFst<I, F> &operator=(const Fst<Arc> &fst) {
-    LOG(FATAL) << "ImplToMutableFst: Assignment operator disallowed";
+    FSTERROR() << "ImplToMutableFst: Assignment operator disallowed";
+    GetImpl()->SetProperties(kError, kError);
     return *this;
   }
 };
 
 
-}  // namespace fst;
+}  // namespace fst
 
 #endif  // FST_LIB_MUTABLE_FST_H__

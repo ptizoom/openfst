@@ -169,7 +169,7 @@ struct Operation {
 // Macro for registering new types of operations.
 
 #define REGISTER_FST_OPERATION(Op, Arc, ArgPack)                        \
-  static Operation<ArgPack>::Registerer                                 \
+  static fst::script::Operation<ArgPack>::Registerer                \
   arc_dispatched_operation_ ## ArgPack ## Op ## Arc ## _registerer(     \
       make_pair(#Op, Arc::Type()), Op<Arc>)
 
@@ -186,8 +186,9 @@ void Apply(const string &op_name, const string &arc_type,
   typename OpReg::OpType op = reg->GetOperation(op_name, arc_type);
 
   if (op == 0) {
-    LOG(FATAL) << "No operation found for \"" << op_name << "\" on "
+    FSTERROR() << "No operation found for \"" << op_name << "\" on "
                << "arc type " << arc_type;
+    return;
   }
 
   op(args);

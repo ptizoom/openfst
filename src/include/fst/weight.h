@@ -28,14 +28,18 @@
 //  A left semiring distributes on the left; a right semiring is
 //  similarly defined.
 //
-// A Weight class is required to be (at least) a left or right semiring.
+// A Weight class must have binary functions =Plus= and =Times= and
+// static member functions =Zero()= and =One()= and these must form
+// (at least) a left or right semiring.
 //
 // In addition, the following should be defined for a Weight:
 //   Member: predicate on set membership.
-//   >>: reads weight.
-//   <<: prints weight.
-//   Read(istream &strm): reads from an input stream.
-//   Write(ostream &strm): writes to an output stream.
+//   NoWeight: static member function that returns an element that is
+//      not a set member; used to signal an error.
+//   >>: reads textual representation of a weight.
+//   <<: prints textual representation of a weight.
+//   Read(istream &strm): reads binary representation of a weight.
+//   Write(ostream &strm): writes binary representation of a weight.
 //   Hash: maps weight to size_t.
 //   ApproxEqual: approximate equality (for inexact weights)
 //   Quantize: quantizes wrt delta (for inexact weights)
@@ -44,11 +48,9 @@
 //      and Times(a, b') == c
 //     --> a' = Divide(c, b, DIVIDE_RIGHT) if a right semiring, a'.Member()
 //      and Times(a', b) == c
-//     --> b' = Divide(c, a)
-//            = Divide(c, a, DIVIDE_ANY)
-//            = Divide(c, a, DIVIDE_LEFT)
-//            = Divide(c, a, DIVIDE_RIGHT) if a commutative semiring,
-//      b'.Member() and Times(a, b') == Times(b', a) == c
+//     --> b' = Divide(c, a) = Divide(c, a, DIVIDE_ANY) =
+//      Divide(c, a, DIVIDE_LEFT) = Divide(c, a, DIVIDE_RIGHT) if a
+//      commutative semiring, b'.Member() and Times(a, b') = Times(b', a) = c
 //   ReverseWeight: the type of the corresponding reverse weight.
 //     Typically the same type as Weight for a (both left and right) semiring.
 //     For the left string semiring, it is the right string semiring.
@@ -64,7 +66,7 @@
 //      RightSemiring: indicates weights form a right semiring.
 //      Commutative: for all a,b: Times(a,b) == Times(b,a)
 //      Idempotent: for all a: Plus(a, a) == a.
-//      Path Property: for all a, b: Plus(a, b) == a or Plus(a, b) == b.
+//      Path: for all a, b: Plus(a, b) == a or Plus(a, b) == b.
 
 
 #ifndef FST_LIB_WEIGHT_H__
@@ -76,7 +78,9 @@
 #include <sstream>
 
 #include <fst/compat.h>
+
 #include <fst/util.h>
+
 
 namespace fst {
 
@@ -114,12 +118,14 @@ enum DivideType { DIVIDE_LEFT,   // left division
 //
 // By definition:
 //                 a <= b iff a + b = a
-// The natural order is a monotonic and negative partial order iff the
-// semiring is idempotent and (left and right) distributive. It is a
-// total order iff the semiring has the path property. See Mohri,
-// "Semiring Framework and Algorithms for Shortest-Distance Problems",
-// Journal of Automata, Languages and Combinatorics 7(3):321-350,
-// 2002. We define the strict version of this order below.
+// The natural order is a negative partial order iff the semiring is
+// idempotent. It is trivially monotonic for plus. It is left
+// (resp. right) monotonic for times iff the semiring is left
+// (resp. right) distributive. It is a total order iff the semiring
+// has the path property. See Mohri, "Semiring Framework and
+// Algorithms for Shortest-Distance Problems", Journal of Automata,
+// Languages and Combinatorics 7(3):321-350, 2002. We define the
+// strict version of this order below.
 
 template <class W>
 class NaturalLess {
@@ -127,10 +133,10 @@ class NaturalLess {
   typedef W Weight;
 
   NaturalLess() {
-    uint64 props = kIdempotent | kLeftSemiring | kRightSemiring;
-    if ((W::Properties() & props) != props)
-      LOG(ERROR) << "NaturalLess: Weight type is not idempotent and "
-                 << "(left and right) distributive: " << W::Type();
+    if (!(W::Properties() & kIdempotent)) {
+      FSTERROR() << "NaturalLess: Weight type is not idempotent: "
+                 << W::Type();
+    }
   }
 
   bool operator()(const W &w1, const W &w2) const {
@@ -138,6 +144,36 @@ class NaturalLess {
   }
 };
 
-}  // namespace fst;
+
+// Power is the iterated product for arbitrary semirings such that
+// Power(w, 0) is One() for the semiring, and
+// Power(w, n) = Times(Power(w, n-1), w)
+
+template <class W>
+W Power(W w, size_t n) {
+  W result = W::One();
+  for (size_t i = 0; i < n; ++i) {
+    result = Times(result, w);
+  }
+  return result;
+}
+
+// General weight converter - raises error.
+template <class W1, class W2>
+struct WeightConvert {
+  W2 operator()(W1 w1) const {
+    FSTERROR() << "WeightConvert: can't convert weight from \""
+               << W1::Type() << "\" to \"" << W2::Type();
+    return W2::NoWeight();
+  }
+};
+
+// Specialized weight converter to self.
+template <class W>
+struct WeightConvert<W, W> {
+  W operator()(W w) const { return w; }
+};
+
+}  // namespace fst
 
 #endif  // FST_LIB_WEIGHT_H__

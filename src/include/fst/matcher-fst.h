@@ -25,6 +25,7 @@
 #include <fst/const-fst.h>
 #include <fst/lookahead-matcher.h>
 
+
 namespace fst {
 
 // WRITABLE MATCHERS - these have the interface of Matchers (see
@@ -119,6 +120,14 @@ class MatcherFst
   static MatcherFst<F, M, N, I> *Read(const string &filename) {
     Impl *impl = ImplToExpandedFst<Impl>::Read(filename);
     return impl ? new MatcherFst<F, M, N, I>(impl) : 0;
+  }
+
+  virtual bool Write(ostream &strm, const FstWriteOptions &opts) const {
+    return GetImpl()->Write(strm, opts);
+  }
+
+  virtual bool Write(const string &filename) const {
+    return Fst<Arc>::WriteFile(filename);
   }
 
   virtual void InitStateIterator(StateIteratorData<Arc> *data) const {

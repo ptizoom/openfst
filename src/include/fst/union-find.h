@@ -47,7 +47,6 @@ class UnionFind {
         || item == fail_
         || parent_[item] == fail_) return fail_;
 
-    CHECK(exec_stack_.empty());
     T *p = &parent_[item];
     for (; *p != item; item = *p, p = &parent_[item]) {
       exec_stack_.push(p);
@@ -106,6 +105,6 @@ class UnionFind {
   DISALLOW_COPY_AND_ASSIGN(UnionFind);
 };
 
-}
+}  // namespace fst
 
 #endif  // __fst_union_find_inl_h__

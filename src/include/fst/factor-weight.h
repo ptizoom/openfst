@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
 #include <fst/slist.h>
 #include <string>
 #include <utility>
@@ -33,6 +34,7 @@ using std::vector;
 
 #include <fst/cache.h>
 #include <fst/test-properties.h>
+
 
 namespace fst {
 
@@ -153,11 +155,10 @@ class FactorWeightFstImpl
  public:
   using FstImpl<A>::SetType;
   using FstImpl<A>::SetProperties;
-  using FstImpl<A>::Properties;
   using FstImpl<A>::SetInputSymbols;
   using FstImpl<A>::SetOutputSymbols;
 
-  using CacheBaseImpl< CacheState<A> >::AddArc;
+  using CacheBaseImpl< CacheState<A> >::PushArc;
   using CacheBaseImpl< CacheState<A> >::HasStart;
   using CacheBaseImpl< CacheState<A> >::HasFinal;
   using CacheBaseImpl< CacheState<A> >::HasArcs;
@@ -261,6 +262,15 @@ class FactorWeightFstImpl
     return CacheImpl<A>::NumOutputEpsilons(s);
   }
 
+  uint64 Properties() const { return Properties(kFstProperties); }
+
+  // Set error if found; return FST impl properties.
+  uint64 Properties(uint64 mask) const {
+    if ((mask & kError) && fst_->Properties(kError, false))
+      SetProperties(kError, kError);
+    return FstImpl<Arc>::Properties(mask);
+  }
+
   void InitArcIterator(StateId s, ArcIteratorData<A> *data) {
     if (!HasArcs(s))
       Expand(s);
@@ -305,13 +315,13 @@ class FactorWeightFstImpl
         FactorIterator fit(w);
         if (!(mode_ & kFactorArcWeights) || fit.Done()) {
           StateId d = FindState(Element(arc.nextstate, Weight::One()));
-          AddArc(s, Arc(arc.ilabel, arc.olabel, w, d));
+          PushArc(s, Arc(arc.ilabel, arc.olabel, w, d));
         } else {
           for (; !fit.Done(); fit.Next()) {
             const pair<Weight, Weight> &p = fit.Value();
             StateId d = FindState(Element(arc.nextstate,
                                           p.second.Quantize(delta_)));
-            AddArc(s, Arc(arc.ilabel, arc.olabel, p.first, d));
+            PushArc(s, Arc(arc.ilabel, arc.olabel, p.first, d));
           }
         }
       }
@@ -329,7 +339,7 @@ class FactorWeightFstImpl
         const pair<Weight, Weight> &p = fit.Value();
         StateId d = FindState(Element(kNoStateId,
                                       p.second.Quantize(delta_)));
-        AddArc(s, Arc(final_ilabel_, final_olabel_, p.first, d));
+        PushArc(s, Arc(final_ilabel_, final_olabel_, p.first, d));
       }
     }
     SetArcs(s);

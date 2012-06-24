@@ -21,6 +21,9 @@
 #ifndef FST_TEST_WEIGHT_TESTER_H_
 #define FST_TEST_WEIGHT_TESTER_H_
 
+#include <iostream>
+#include <sstream>
+
 #include <fst/random-weight.h>
 
 namespace fst {
@@ -33,7 +36,7 @@ class WeightTester {
  public:
   WeightTester(WeightGenerator generator) : weight_generator_(generator) {}
 
-  void Test(int iterations) {
+  void Test(int iterations, bool test_division = true) {
     for (int i = 0; i < iterations; ++i) {
       // Selects the test weights.
       Weight w1 = weight_generator_();
@@ -46,10 +49,12 @@ class WeightTester {
       VLOG(1) << "w3 = " << w3;
 
       TestSemiring(w1, w2, w3);
-      TestDivision(w1, w2);
+      if (test_division)
+        TestDivision(w1, w2);
       TestReverse(w1, w2);
       TestEquality(w1, w2, w3);
       TestIO(w1);
+      TestCopy(w1);
     }
   }
 
@@ -73,6 +78,13 @@ class WeightTester {
     CHECK(Times(w1, Weight::One()) == w1);
     CHECK(Times(Weight::One(), w1) == w1);
 
+    // Check the no weight element.
+    CHECK(!Weight::NoWeight().Member());
+    CHECK(!Plus(w1, Weight::NoWeight()).Member());
+    CHECK(!Plus(Weight::NoWeight(), w1).Member());
+    CHECK(!Times(w1, Weight::NoWeight()).Member());
+    CHECK(!Times(Weight::NoWeight(), w1).Member());
+
     // Checks that the operations commute.
     CHECK(ApproxEqual(Plus(w1, w2), Plus(w2, w1)));
     if (Weight::Properties() & kCommutative)
@@ -81,6 +93,15 @@ class WeightTester {
     // Checks Zero() is the annihilator.
     CHECK(Times(w1, Weight::Zero()) == Weight::Zero());
     CHECK(Times(Weight::Zero(), w1) == Weight::Zero());
+
+    // Check Power(w, 0) is Weight::One()
+    CHECK(Power(w1, 0) == Weight::One());
+
+    // Check Power(w, 1) is w
+    CHECK(Power(w1, 1) == w1);
+
+    // Check Power(w, 3) is Times(w, Times(w, w))
+    CHECK(Power(w1, 3) == Times(w1, Times(w1, w1)));
 
     // Checks distributivity.
     if (Weight::Properties() & kLeftSemiring)
@@ -112,12 +133,16 @@ class WeightTester {
       Weight d = Divide(p, w1, DIVIDE_LEFT);
       if (d.Member())
         CHECK(ApproxEqual(p, Times(w1, d)));
+      CHECK(!Divide(w1, Weight::NoWeight(), DIVIDE_LEFT).Member());
+      CHECK(!Divide(Weight::NoWeight(), w1, DIVIDE_LEFT).Member());
     }
 
     if (Weight::Properties() & kRightSemiring) {
       Weight d = Divide(p, w2, DIVIDE_RIGHT);
       if (d.Member())
         CHECK(ApproxEqual(p, Times(d, w2)));
+      CHECK(!Divide(w1, Weight::NoWeight(), DIVIDE_RIGHT).Member());
+      CHECK(!Divide(Weight::NoWeight(), w1, DIVIDE_RIGHT).Member());
     }
 
     if (Weight::Properties() & kCommutative) {
@@ -154,16 +179,16 @@ class WeightTester {
 
   // Tests binary serialization and textual I/O.
   void TestIO(Weight w) {
-
-    /*
-    // Tests binary serialization.
+    // Tests binary I/O
     {
-      string s;
-      w.Data(&s);
-      Weight v(s);
-      CHECK(w == v);
+    ostringstream os;
+    w.Write(os);
+    os.flush();
+    istringstream is(os.str());
+    Weight v;
+    v.Read(is);
+    CHECK_EQ(w, v);
     }
-    */
 
     // Tests textual I/O.
     {
@@ -174,6 +199,19 @@ class WeightTester {
       is >> v;
       CHECK(ApproxEqual(w, v));
     }
+  }
+
+  // Tests copy constructor and assignment operator
+  void TestCopy(Weight w) {
+    Weight x = w;
+    CHECK(w == x);
+
+    x = Weight(w);
+    CHECK(w == x);
+
+    x.operator=(x);
+    CHECK(w == x);
+
   }
 
   // Generates weights used in testing.

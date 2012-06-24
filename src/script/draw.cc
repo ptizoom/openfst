@@ -28,7 +28,7 @@ void DrawFst(const FstClass &fst,
              const SymbolTable *osyms,
              const SymbolTable *ssyms,
              bool accep,
-             string title,
+             const string &title,
              float width,
              float height,
              bool portrait,
@@ -49,6 +49,7 @@ void DrawFst(const FstClass &fst,
 
 REGISTER_FST_OPERATION(DrawFst, StdArc, FstDrawerArgs);
 REGISTER_FST_OPERATION(DrawFst, LogArc, FstDrawerArgs);
+REGISTER_FST_OPERATION(DrawFst, Log64Arc, FstDrawerArgs);
 
 }  // namespace script
 }  // namespace fst

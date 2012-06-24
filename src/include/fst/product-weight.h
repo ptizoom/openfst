@@ -23,8 +23,10 @@
 
 #include <stack>
 #include <string>
+
 #include <fst/pair-weight.h>
 #include <fst/weight.h>
+
 
 namespace fst {
 
@@ -34,6 +36,7 @@ class ProductWeight : public PairWeight<W1, W2> {
  public:
   using PairWeight<W1, W2>::Zero;
   using PairWeight<W1, W2>::One;
+  using PairWeight<W1, W2>::NoWeight;
   using PairWeight<W1, W2>::Quantize;
   using PairWeight<W1, W2>::Reverse;
 
@@ -54,6 +57,12 @@ class ProductWeight : public PairWeight<W1, W2> {
   static const ProductWeight<W1, W2> &One() {
     static const ProductWeight<W1, W2> one(PairWeight<W1, W2>::One());
     return one;
+  }
+
+  static const ProductWeight<W1, W2> &NoWeight() {
+    static const ProductWeight<W1, W2> no_weight(
+        PairWeight<W1, W2>::NoWeight());
+    return no_weight;
   }
 
   static const string &Type() {
@@ -101,6 +110,6 @@ inline ProductWeight<W1, W2> Divide(const ProductWeight<W1, W2> &w,
                                Divide(w.Value2(), v.Value2(), typ));
 }
 
-}  // namespace fst;
+}  // namespace fst
 
 #endif  // FST_LIB_PRODUCT_WEIGHT_H__

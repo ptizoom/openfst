@@ -1,4 +1,4 @@
-AC_INIT([OpenFst], [1.2.1], [help@www.openfst.org])
+AC_INIT([OpenFst], [1.3.2], [help@www.openfst.org])
 AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror])
 
 AC_PROG_CXX
@@ -19,6 +19,7 @@ AC_CONFIG_FILES([
   src/extensions/const/Makefile
   src/extensions/far/Makefile
   src/extensions/lookahead/Makefile
+  src/extensions/ngram/Makefile
   src/extensions/pdt/Makefile
   src/script/Makefile
 ])
@@ -63,6 +64,15 @@ AC_ARG_ENABLE([far], [AS_HELP_STRING([--enable-far], [enable FAR extensions])],
 AM_CONDITIONAL([HAVE_FAR], [test "x$enable_far" != xno])
 
 AC_ARG_ENABLE(
+	[ngram-fsts],
+	[AS_HELP_STRING(
+		[--enable-ngram-fsts],
+		[enable NGramFst extension])],
+	[],
+	[enable_ngram_fsts=no])
+AM_CONDITIONAL([HAVE_NGRAM], [test "x$enable_ngram_fsts" != xno])
+
+AC_ARG_ENABLE(
 	[lookahead-fsts],
 	[AS_HELP_STRING(
 		[--enable-lookahead-fsts],
@@ -86,7 +96,8 @@ AS_IF([test "x$with_icu" != xno],
     [AC_DEFINE([HAVE_ICU],
       [1],
       [Define to 1 if you have the ICU library.])],
-    [AC_MSG_FAILURE([--with-icu was given, but ICU Library not found])])])
+    [AC_MSG_FAILURE(
+      [--with-icu was given, but ICU Library v. 4.2 or newer not found])])])
 
 AC_SUBST([libfstdir], [${libdir}/fst])
 

@@ -23,17 +23,14 @@
 #include <fst/script/prune.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
-DEFINE_int64(nstate, fst::kNoStateId, "State number parameter");
-DEFINE_string(weight, "", "Weight parameter");
-DEFINE_string(arc_filter, "any", "Arc filter: one of :"
-              " \"any\", \"epsilon\", \"iepsilon\", \"oepsilon\"");
+DEFINE_int64(nstate, fst::kNoStateId, "State number threshold");
+DEFINE_string(weight, "", "Weight threshold");
 
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
   using fst::script::FstClass;
   using fst::script::MutableFstClass;
-  using fst::script::VectorFstClass;
   using fst::script::WeightClass;
 
   string usage = "Prunes states and arcs of an FST.\n\n  Usage: ";
@@ -41,7 +38,7 @@ int main(int argc, char **argv) {
   usage += " [in.fst [out.fst]]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
@@ -50,40 +47,18 @@ int main(int argc, char **argv) {
   string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
   string out_name = argc > 2 ? argv[2] : "";
 
-  FstClass *ifst = FstClass::Read(in_name);
-  if (!ifst) return 1;
-
-  MutableFstClass *ofst = 0;
-  if (ifst->Properties(fst::kMutable, false)) {
-    ofst = static_cast<MutableFstClass *>(ifst);
-  } else {
-    ofst = new VectorFstClass(*ifst);
-    delete ifst;
-  }
+  MutableFstClass *fst = MutableFstClass::Read(in_name, true);
+  if (!fst) return 1;
 
   WeightClass weight_threshold = FLAGS_weight.empty() ?
       WeightClass::Zero() :
-      WeightClass(ifst->WeightType(), FLAGS_weight);
+      WeightClass(fst->WeightType(), FLAGS_weight);
 
-  s::ArcFilterType arc_filter;
-  if (FLAGS_arc_filter == "any") {
-    arc_filter = s::ANY_ARC_FILTER;
-  } else if (FLAGS_arc_filter == "epsilon") {
-    arc_filter = s::EPSILON_ARC_FILTER;
-  } else if (FLAGS_arc_filter == "iepsilon") {
-    arc_filter = s::INPUT_EPSILON_ARC_FILTER;
-  } else if (FLAGS_arc_filter == "oepsilon") {
-    arc_filter = s::OUTPUT_EPSILON_ARC_FILTER;
-  } else {
-    LOG(FATAL) << "Unknown arc filter type: " << FLAGS_arc_filter;
-  }
+  s::PruneOptions opts(weight_threshold, FLAGS_nstate, 0, FLAGS_delta);
 
-  s::PruneOptions opts(weight_threshold, FLAGS_nstate, arc_filter,
-                       0, FLAGS_delta);
+  s::Prune(fst, opts);
 
-  s::Prune(ofst, opts);
-
-  ofst->Write(out_name);
+  fst->Write(out_name);
 
   return 0;
 }

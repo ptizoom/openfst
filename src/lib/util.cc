@@ -22,30 +22,71 @@
 #include <string>
 #include <fst/util.h>
 
+// Utility flag definitions
+
+DEFINE_bool(fst_error_fatal, true,
+            "FST errors are fatal; o.w. return objects flagged as bad: "
+            " e.g., FSTs - kError prop. true, FST weights - not  a Member()");
+
 namespace fst {
 
 int64 StrToInt64(const string &s, const string &src, size_t nline,
-                 bool allow_negative = false) {
+                 bool allow_negative = false, bool *error) {
   int64 n;
   const char *cs = s.c_str();
   char *p;
+  if (error) *error = false;
   n = strtoll(cs, &p, 10);
-  if (p < cs + s.size() || (!allow_negative && n < 0))
-    LOG(FATAL) << "StrToInt64: Bad integer = " << s
+  if (p < cs + s.size() || (!allow_negative && n < 0)) {
+    FSTERROR() << "StrToInt64: Bad integer = " << s
                << "\", source = " << src << ", line = " << nline;
+    if (error) *error = true;
+    return 0;
+  }
   return n;
 }
 
 void Int64ToStr(int64 n, string *s) {
-  const int kNumLen = 128;
-  char nstr[kNumLen];
-  snprintf(nstr, kNumLen, "%lld", n);
-  *s += nstr;
+  ostringstream nstr;
+  nstr << n;
+  s->append(nstr.str().data(), nstr.str().size());
 }
 
 void ConvertToLegalCSymbol(string *s) {
   for (string::iterator it = s->begin(); it != s->end(); ++it)
     if (!isalnum(*it)) *it = '_';
 }
+
+// Skips over input characters to align to 'align' bytes. Returns
+// false if can't align.
+bool AlignInput(istream &strm, int align) {
+  char c;
+  for (int i = 0; i < align; ++i) {
+    int64 pos = strm.tellg();
+    if (pos < 0) {
+      LOG(ERROR) << "AlignInput: can't determine stream position";
+      return false;
+    }
+    if (pos % align == 0) break;
+    strm.read(&c, 1);
+  }
+  return true;
+}
+
+// Write null output characters to align to 'align' bytes. Returns
+// false if can't align.
+bool AlignOutput(ostream &strm, int align) {
+  for (int i = 0; i < align; ++i) {
+    int64 pos = strm.tellp();
+    if (pos < 0) {
+      LOG(ERROR) << "AlignOutput: can't determine stream position";
+      return false;
+    }
+    if (pos % align == 0) break;
+    strm.write("", 1);
+  }
+  return true;
+}
+
 
 }  // namespace fst

@@ -25,6 +25,7 @@
 #include <fst/const-fst.h>
 #include <fst/matcher-fst.h>
 #include <fst/vector-fst.h>
+#include <fst/edit-fst.h>
 
 // FST flag definitions
 
@@ -46,16 +47,23 @@ DEFINE_bool(fst_default_cache_gc, true, "Enable garbage collection of cache");
 DEFINE_int64(fst_default_cache_gc_limit, 1<<20LL,
              "Cache byte size that triggers garbage collection");
 
+DEFINE_bool(fst_align, false, "Write FST data aligned where appropriate");
+
 DEFINE_string(save_relabel_ipairs, "",  "Save input relabel pairs to file");
 DEFINE_string(save_relabel_opairs, "",  "Save output relabel pairs to file");
 
 namespace fst {
 
-// Register VectorFst and ConstFst for common arcs types
+// Register VectorFst, ConstFst and EditFst for common arcs types
 REGISTER_FST(VectorFst, StdArc);
 REGISTER_FST(VectorFst, LogArc);
+REGISTER_FST(VectorFst, Log64Arc);
 REGISTER_FST(ConstFst, StdArc);
 REGISTER_FST(ConstFst, LogArc);
+REGISTER_FST(ConstFst, Log64Arc);
+REGISTER_FST(EditFst, StdArc);
+REGISTER_FST(EditFst, LogArc);
+REGISTER_FST(EditFst, Log64Arc);
 
 // Register CompactFst for common arcs with the default (uint32) size type
 static FstRegisterer<
@@ -156,4 +164,4 @@ bool FstHeader::Write(ostream &strm, const string &source) const {
   return true;
 }
 
-}
+}  // namespace fst

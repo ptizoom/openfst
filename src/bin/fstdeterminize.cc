@@ -23,8 +23,8 @@
 #include <fst/script/determinize.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
-DEFINE_int64(nstate, fst::kNoStateId, "State number parameter");
-DEFINE_string(weight, "", "Weight parameter");
+DEFINE_int64(nstate, fst::kNoStateId, "State number threshold");
+DEFINE_string(weight, "", "Weight threshold");
 DEFINE_int64(subsequential_label, 0,
              "Input label of arc corresponding to residual final output when"
              " producing a subsequential transducer");
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
   usage += " [in.fst [out.fst]]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;

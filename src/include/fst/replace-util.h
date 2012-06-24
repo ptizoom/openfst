@@ -27,12 +27,16 @@
 using std::vector;
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
 #include <tr1/unordered_set>
 using std::tr1::unordered_set;
+using std::tr1::unordered_multiset;
+#include <map>
 
 #include <fst/connect.h>
 #include <fst/mutable-fst.h>
 #include <fst/topsort.h>
+
 
 namespace fst {
 
@@ -79,13 +83,13 @@ class ReplaceUtil {
   // True if the non-terminal dependencies are cyclic. Cyclic
   // dependencies will result in an unexpandable replace fst.
   bool CyclicDependencies() const {
-    GetDependencies();
+    GetDependencies(false);
     return depprops_ & kCyclic;
   }
 
   // Returns true if no useless Fsts, states or transitions.
   bool Connected() const {
-    GetDependencies();
+    GetDependencies(false);
     uint64 props = kAccessible | kCoAccessible;
     for (Label i = 0; i < fst_array_.size(); ++i) {
       if (!fst_array_[i])
@@ -100,13 +104,26 @@ class ReplaceUtil {
   void Connect();
 
   // Replaces Fsts specified by labels.
+  // Does nothing if there are cyclic dependencies.
   void ReplaceLabels(const vector<Label> &labels);
 
+  // Replaces Fsts that have at most 'nstates' states, 'narcs' arcs and
+  // 'nnonterm' non-terminals (updating in reverse dependency order).
+  // Does nothing if there are cyclic dependencies.
+  void ReplaceBySize(size_t nstates, size_t narcs, size_t nnonterms);
+
   // Replaces singleton Fsts.
-  void ReplaceTrivial();
+  // Does nothing if there are cyclic dependencies.
+  void ReplaceTrivial() { ReplaceBySize(2, 1, 1); }
+
+  // Replaces non-terminals that have at most 'ninstances' instances
+  // (updating in dependency order).
+  // Does nothing if there are cyclic dependencies.
+  void ReplaceByInstances(size_t ninstances);
 
   // Replaces non-terminals that have only one instance.
-  void ReplaceUnique();
+  // Does nothing if there are cyclic dependencies.
+  void ReplaceUnique() { ReplaceByInstances(1); }
 
   // Returns Label, Fst pairs; Fst ownership retained by ReplaceUtil.
   void GetFstPairs(vector<FstPair> *fst_pairs);
@@ -121,7 +138,12 @@ class ReplaceUtil {
     StateId nfinal;     // # of final states
     size_t narcs;       // # of arcs
     Label nnonterms;    // # of non-terminals in Fst
-    Label nref;         // # of non-terminal instances referring to this Fst
+    size_t nref;        // # of non-terminal instances referring to this Fst
+
+    // # of times that ith Fst references this Fst
+    map<Label, size_t> inref;
+    // # of times that this Fst references the ith Fst
+    map<Label, size_t> outref;
 
     ReplaceStats()
         : nstates(0),
@@ -134,15 +156,22 @@ class ReplaceUtil {
   // Check Mutable Fsts exist o.w. create them.
   void CheckMutableFsts();
 
-  // Computes the dependency graph of the replace Fsts and related
-  // information.
-  void GetDependencies() const;
+  // Computes the dependency graph of the replace Fsts.
+  // If 'stats' is true, dependency statistics computed as well.
+  void GetDependencies(bool stats) const;
 
-  void ClearDependencies() {
+  void ClearDependencies() const {
     depfst_.DeleteStates();
     stats_.clear();
     depprops_ = 0;
+    have_stats_ = false;
   }
+
+  // Get topological order of dependencies. Returns false with cyclic input.
+  bool GetTopOrder(const Fst<Arc> &fst, vector<Label> *toporder) const;
+
+  // Update statistics assuming that jth Fst will be replaced.
+  void UpdateStats(Label j);
 
   Label root_label_;                              // root non-terminal
   Label root_fst_;                                // root Fst ID
@@ -154,8 +183,8 @@ class ReplaceUtil {
   mutable VectorFst<Arc> depfst_;                 // Fst ID dependencies
   mutable vector<bool> depaccess_;                // Fst ID accessibility
   mutable uint64 depprops_;                       // dependency Fst props
+  mutable bool have_stats_;                       // have dependency statistics
   mutable vector<ReplaceStats> stats_;            // Per Fst statistics
-
   DISALLOW_COPY_AND_ASSIGN(ReplaceUtil);
 };
 
@@ -165,7 +194,8 @@ ReplaceUtil<Arc>::ReplaceUtil(
     Label root_label, bool epsilon_on_replace)
     : root_label_(root_label),
       epsilon_on_replace_(epsilon_on_replace),
-      depprops_(0) {
+      depprops_(0),
+      have_stats_(false) {
   fst_array_.push_back(0);
   mutable_fst_array_.push_back(0);
   nonterminal_array_.push_back(kNoLabel);
@@ -178,7 +208,8 @@ ReplaceUtil<Arc>::ReplaceUtil(
     mutable_fst_array_.push_back(fst);
   }
   root_fst_ = nonterminal_hash_[root_label_];
-  CHECK(root_fst_);
+  if (!root_fst_)
+    FSTERROR() << "ReplaceUtil: no root FST for label: " << root_label_;
 }
 
 template <class Arc>
@@ -187,7 +218,8 @@ ReplaceUtil<Arc>::ReplaceUtil(
     Label root_label, bool epsilon_on_replace)
     : root_label_(root_label),
       epsilon_on_replace_(epsilon_on_replace),
-      depprops_(0) {
+      depprops_(0),
+      have_stats_(false) {
   fst_array_.push_back(0);
   nonterminal_array_.push_back(kNoLabel);
   for (Label i = 0; i < fst_pairs.size(); ++i) {
@@ -198,7 +230,8 @@ ReplaceUtil<Arc>::ReplaceUtil(
     fst_array_.push_back(fst->Copy());
   }
   root_fst_ = nonterminal_hash_[root_label];
-  CHECK(root_fst_);
+  if (!root_fst_)
+    FSTERROR() << "ReplaceUtil: no root FST for label: " << root_label_;
 }
 
 template <class Arc>
@@ -210,7 +243,8 @@ ReplaceUtil<Arc>::ReplaceUtil(
       epsilon_on_replace_(epsilon_on_replace),
       nonterminal_array_(fst_array.size()),
       nonterminal_hash_(nonterminal_hash),
-      depprops_(0) {
+      depprops_(0),
+      have_stats_(false) {
   fst_array_.push_back(0);
   for (Label i = 1; i < fst_array.size(); ++i)
     fst_array_.push_back(fst_array[i]->Copy());
@@ -221,14 +255,23 @@ ReplaceUtil<Arc>::ReplaceUtil(
 }
 
 template <class Arc>
-void ReplaceUtil<Arc>::GetDependencies() const {
-  if (depfst_.NumStates() > 0)
-    return;
+void ReplaceUtil<Arc>::GetDependencies(bool stats) const {
+  if (depfst_.NumStates() > 0) {
+    if (stats && !have_stats_)
+      ClearDependencies();
+    else
+      return;
+  }
+
+  have_stats_ = stats;
+  if (have_stats_)
+    stats_.reserve(fst_array_.size());
 
   for (Label i = 0; i < fst_array_.size(); ++i) {
     depfst_.AddState();
     depfst_.SetFinal(i, Weight::One());
-    stats_.push_back(ReplaceStats());
+    if (have_stats_)
+      stats_.push_back(ReplaceStats());
   }
   depfst_.SetStart(root_fst_);
 
@@ -240,21 +283,28 @@ void ReplaceUtil<Arc>::GetDependencies() const {
       continue;
     for (StateIterator<Fst<Arc> > siter(*ifst); !siter.Done(); siter.Next()) {
       StateId s = siter.Value();
-      ++stats_[i].nstates;
-      if (ifst->Final(s) != Weight::Zero())
-        ++stats_[i].nfinal;
+      if (have_stats_) {
+        ++stats_[i].nstates;
+        if (ifst->Final(s) != Weight::Zero())
+          ++stats_[i].nfinal;
+      }
       for (ArcIterator<Fst<Arc> > aiter(*ifst, s);
            !aiter.Done(); aiter.Next()) {
-        ++stats_[i].narcs;
+        if (have_stats_)
+          ++stats_[i].narcs;
         const Arc& arc = aiter.Value();
 
         typename NonTerminalHash::const_iterator it =
             nonterminal_hash_.find(arc.olabel);
         if (it != nonterminal_hash_.end()) {
-          ++stats_[i].nnonterms;
           Label j = it->second;
-          ++stats_[j].nref;
           depfst_.AddArc(i, Arc(arc.olabel, arc.olabel, Weight::One(), j));
+          if (have_stats_) {
+            ++stats_[i].nnonterms;
+            ++stats_[j].nref;
+            ++stats_[j].inref[i];
+            ++stats_[i].outref[j];
+          }
         }
       }
     }
@@ -263,6 +313,53 @@ void ReplaceUtil<Arc>::GetDependencies() const {
   // Gets accessibility info
   SccVisitor<Arc> scc_visitor(0, &depaccess_, 0, &depprops_);
   DfsVisit(depfst_, &scc_visitor);
+}
+
+template <class Arc>
+void ReplaceUtil<Arc>::UpdateStats(Label j) {
+  if (!have_stats_) {
+    FSTERROR() << "ReplaceUtil::UpdateStats: stats not available";
+    return;
+  }
+
+  if (j == root_fst_)  // can't replace root
+    return;
+
+  typedef typename map<Label, size_t>::iterator Iter;
+  for (Iter in = stats_[j].inref.begin();
+       in != stats_[j].inref.end();
+       ++in) {
+    Label i = in->first;
+    size_t ni = in->second;
+    stats_[i].nstates += stats_[j].nstates * ni;
+    stats_[i].narcs += (stats_[j].narcs + 1) * ni;  // narcs - 1 + 2 (eps)
+    stats_[i].nnonterms += (stats_[j].nnonterms - 1) * ni;
+    stats_[i].outref.erase(stats_[i].outref.find(j));
+    for (Iter out = stats_[j].outref.begin();
+         out != stats_[j].outref.end();
+         ++out) {
+      Label k = out->first;
+      size_t nk = out->second;
+      stats_[i].outref[k] += ni * nk;
+    }
+  }
+
+  for (Iter out = stats_[j].outref.begin();
+       out != stats_[j].outref.end();
+       ++out) {
+    Label k = out->first;
+    size_t nk = out->second;
+    stats_[k].nref -= nk;
+    stats_[k].inref.erase(stats_[k].inref.find(j));
+    for (Iter in = stats_[j].inref.begin();
+         in != stats_[j].inref.end();
+         ++in) {
+      Label i = in->first;
+      size_t ni = in->second;
+      stats_[k].inref[i] += ni * nk;
+      stats_[k].nref += ni * nk;
+    }
+  }
 }
 
 template <class Arc>
@@ -290,7 +387,7 @@ void ReplaceUtil<Arc>::Connect() {
     if (mutable_fst_array_[i]->Properties(props, false) != props)
       fst::Connect(mutable_fst_array_[i]);
   }
-  GetDependencies();
+  GetDependencies(false);
   for (Label i = 0; i < mutable_fst_array_.size(); ++i) {
     MutableFst<Arc> *fst = mutable_fst_array_[i];
     if (fst && !depaccess_[i]) {
@@ -303,14 +400,36 @@ void ReplaceUtil<Arc>::Connect() {
 }
 
 template <class Arc>
+bool ReplaceUtil<Arc>::GetTopOrder(const Fst<Arc> &fst,
+                                   vector<Label> *toporder) const {
+  // Finds topological order of dependencies.
+  vector<StateId> order;
+  bool acyclic = false;
+
+  TopOrderVisitor<Arc> top_order_visitor(&order, &acyclic);
+  DfsVisit(fst, &top_order_visitor);
+  if (!acyclic) {
+    LOG(WARNING) << "ReplaceUtil::GetTopOrder: Cyclical label dependencies";
+    return false;
+  }
+
+  toporder->resize(order.size());
+  for (Label i = 0; i < order.size(); ++i)
+    (*toporder)[order[i]] = i;
+
+  return true;
+}
+
+template <class Arc>
 void ReplaceUtil<Arc>::ReplaceLabels(const vector<Label> &labels) {
   CheckMutableFsts();
   unordered_set<Label> label_set;
   for (Label i = 0; i < labels.size(); ++i)
-    label_set.insert(labels[i]);
+    if (labels[i] != root_label_)  // can't replace root
+      label_set.insert(labels[i]);
 
   // Finds Fst dependencies restricted to the labels requested.
-  GetDependencies();
+  GetDependencies(false);
   VectorFst<Arc> pfst(depfst_);
   for (StateId i = 0; i < pfst.NumStates(); ++i) {
     vector<Arc> arcs;
@@ -326,24 +445,17 @@ void ReplaceUtil<Arc>::ReplaceLabels(const vector<Label> &labels) {
       pfst.AddArc(i, arcs[j]);
   }
 
-  // Finds topological order of dependencies.
-  vector<StateId> order;
-  bool acyclic = false;
-
-  TopOrderVisitor<Arc> top_order_visitor(&order, &acyclic);
-  DfsVisit(pfst, &top_order_visitor);
-  if (!acyclic)
-    LOG(FATAL) << "ReplaceUtil::ReplaceLabels: Cyclical label dependencies";
-
-  vector<StateId> inv_order(order.size());
-  for (Label i = 0; i < order.size(); ++i)
-    inv_order[order[i]] = i;
+  vector<Label> toporder;
+  if (!GetTopOrder(pfst, &toporder)) {
+    ClearDependencies();
+    return;
+  }
 
   // Visits Fsts in reverse topological order of dependencies and
   // performs replacements.
-  for (Label i = inv_order.size() - 1; i >= 0;  --i) {
+  for (Label o = toporder.size() - 1; o >= 0;  --o) {
     vector<FstPair> fst_pairs;
-    StateId s = inv_order[i];
+    StateId s = toporder[o];
     for (ArcIterator< VectorFst<Arc> > aiter(pfst, s);
          !aiter.Done(); aiter.Next()) {
       const Arc &arc = aiter.Value();
@@ -363,28 +475,46 @@ void ReplaceUtil<Arc>::ReplaceLabels(const vector<Label> &labels) {
 }
 
 template <class Arc>
-void ReplaceUtil<Arc>::ReplaceTrivial() {
+void ReplaceUtil<Arc>::ReplaceBySize(size_t nstates, size_t narcs,
+                                     size_t nnonterms) {
   vector<Label> labels;
-  GetDependencies();
+  GetDependencies(true);
 
-  for (Label i = 0; i < fst_array_.size(); ++i) {
-    if (stats_[i].nstates <= 2 && stats_[i].narcs <= 1)
-      labels.push_back(nonterminal_array_[i]);
+  vector<Label> toporder;
+  if (!GetTopOrder(depfst_, &toporder)) {
+    ClearDependencies();
+    return;
   }
 
+  for (Label o = toporder.size() - 1; o >= 0; --o) {
+    Label j = toporder[o];
+    if (stats_[j].nstates <= nstates &&
+        stats_[j].narcs <= narcs &&
+        stats_[j].nnonterms <= nnonterms) {
+      labels.push_back(nonterminal_array_[j]);
+      UpdateStats(j);
+    }
+  }
   ReplaceLabels(labels);
 }
 
 template <class Arc>
-void ReplaceUtil<Arc>::ReplaceUnique() {
+void ReplaceUtil<Arc>::ReplaceByInstances(size_t ninstances) {
   vector<Label> labels;
-  GetDependencies();
+  GetDependencies(true);
 
-  for (Label i = 0; i < fst_array_.size(); ++i) {
-    if (stats_[i].nref == 1)
-      labels.push_back(nonterminal_array_[i]);
+  vector<Label> toporder;
+  if (!GetTopOrder(depfst_, &toporder)) {
+    ClearDependencies();
+    return;
   }
-
+  for (Label o = 0; o < toporder.size(); ++o) {
+    Label j = toporder[o];
+    if (stats_[j].nref <= ninstances) {
+      labels.push_back(nonterminal_array_[j]);
+      UpdateStats(j);
+    }
+  }
   ReplaceLabels(labels);
 }
 

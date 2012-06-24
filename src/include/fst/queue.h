@@ -31,6 +31,7 @@ using std::vector;
 #include <fst/heap.h>
 #include <fst/topsort.h>
 
+
 namespace fst {
 
 // template <class S>
@@ -75,7 +76,7 @@ class QueueBase {
  public:
   typedef S StateId;
 
-  QueueBase(QueueType type) : queue_type_(type) {}
+  QueueBase(QueueType type) : queue_type_(type), error_(false) {}
   virtual ~QueueBase() {}
   StateId Head() const { return Head_(); }
   void Enqueue(StateId s) { Enqueue_(s); }
@@ -84,6 +85,8 @@ class QueueBase {
   bool Empty() const { return Empty_(); }
   void Clear() { Clear_(); }
   QueueType Type() { return queue_type_; }
+  bool Error() const { return error_; }
+  void SetError(bool error) { error_ = error; }
 
  private:
   // This allows base-class virtual access to non-virtual derived-
@@ -97,6 +100,7 @@ class QueueBase {
   virtual void Clear_() = 0;
 
   QueueType queue_type_;
+  bool error_;
 };
 
 
@@ -287,8 +291,8 @@ class StateWeightCompare {
 };
 
 
-// Shortest-first queue discipline, templated on the StateId and Weight is
-// specialized to use the weight's natural order for the comparion function.
+// Shortest-first queue discipline, templated on the StateId and Weight, is
+// specialized to use the weight's natural order for the comparison function.
 template <typename S, typename W>
 class NaturalShortestFirstQueue :
       public ShortestFirstQueue<S, StateWeightCompare<S, NaturalLess<W> > > {
@@ -302,7 +306,6 @@ class NaturalShortestFirstQueue :
   NaturalLess<W> less_;
 };
 
-
 // Topological-order queue discipline, templated on the StateId.
 // States are ordered in the queue topologically. The FST must be acyclic.
 template <class S>
@@ -314,15 +317,16 @@ class TopOrderQueue : public QueueBase<S> {
   // to limit the transitions considered in that computation (e.g., only
   // the epsilon graph).
   template <class Arc, class ArcFilter>
-
   TopOrderQueue(const Fst<Arc> &fst, ArcFilter filter)
       : QueueBase<S>(TOP_ORDER_QUEUE), front_(0), back_(kNoStateId),
         order_(0), state_(0) {
     bool acyclic;
     TopOrderVisitor<Arc> top_order_visitor(&order_, &acyclic);
     DfsVisit(fst, &top_order_visitor, filter);
-    if (!acyclic)
-      LOG(FATAL) << "TopOrderQueue: fst is not acyclic.";
+    if (!acyclic) {
+      FSTERROR() << "TopOrderQueue: fst is not acyclic.";
+      QueueBase<S>::SetError(true);
+    }
     state_.resize(order_.size(), kNoStateId);
   }
 
@@ -371,7 +375,6 @@ class TopOrderQueue : public QueueBase<S> {
   virtual void Update_(StateId s) { Update(s); }
   virtual bool Empty_() const { return Empty(); }
   virtual void Clear_() { return Clear(); }
-
 };
 
 
@@ -448,11 +451,9 @@ class SccQueue : public QueueBase<S> {
     while ((front_ <= back_) &&
            (((*queue_)[front_] && (*queue_)[front_]->Empty())
             || (((*queue_)[front_] == 0) &&
-                ((front_ > trivial_queue_.size())
+                ((front_ >= trivial_queue_.size())
                  || (trivial_queue_[front_] == kNoStateId)))))
       ++front_;
-    if (front_ > back_)
-      LOG(FATAL) << "SccQueue: head of empty queue";
     if ((*queue_)[front_])
       return (*queue_)[front_]->Head();
     else
@@ -473,8 +474,6 @@ class SccQueue : public QueueBase<S> {
   }
 
   void Dequeue() {
-    if (front_ > back_)
-      LOG(FATAL) << "SccQueue: dequeue of empty queue";
     if ((*queue_)[front_])
       (*queue_)[front_]->Dequeue();
     else if (front_ < trivial_queue_.size())
@@ -487,14 +486,14 @@ class SccQueue : public QueueBase<S> {
   }
 
   bool Empty() const {
-    if (front_ < back_)   // Queue scc # back_ not empty unless back_==front_
+    if (front_ < back_)  // Queue scc # back_ not empty unless back_==front_
       return false;
     else if (front_ > back_)
       return true;
     else if ((*queue_)[front_])
       return (*queue_)[front_]->Empty();
     else
-      return (front_ > trivial_queue_.size())
+      return (front_ >= trivial_queue_.size())
         || (trivial_queue_[front_] == kNoStateId);
   }
 
@@ -524,6 +523,8 @@ private:
   virtual void Update_(StateId s) { Update(s); }
   virtual bool Empty_() const { return Empty(); }
   virtual void Clear_() { return Clear(); }
+
+  DISALLOW_COPY_AND_ASSIGN(SccQueue);
 };
 
 
@@ -600,7 +601,6 @@ public:
                     << ": using trivial discipline";
             break;
           case SHORTEST_FIRST_QUEUE:
-            CHECK(comp);
             queues_[i] = new ShortestFirstQueue<StateId, Compare, false>(*comp);
             VLOG(3) << "AutoQueue: SCC #" << i <<
               ": using shortest-first discipline";
@@ -669,6 +669,8 @@ public:
   virtual bool Empty_() const { return Empty(); }
 
   virtual void Clear_() { return Clear(); }
+
+  DISALLOW_COPY_AND_ASSIGN(AutoQueue);
 };
 
 
@@ -723,6 +725,164 @@ void AutoQueue<StateId>::SccQueueType(const Fst<A> &fst,
     }
   }
 }
+
+
+// An A* estimate is a function object that maps from a state ID to a
+// an estimate of the shortest distance to the final states.
+// The trivial A* estimate is always One().
+template <typename S, typename W>
+struct TrivialAStarEstimate {
+  W operator()(S s) const { return W::One(); }
+};
+
+
+// Given a vector that maps from states to weights representing the
+// shortest distance from the initial state, a Less comparison
+// function object between weights, and an estimate E of the
+// shortest distance to the final states, this class defines a
+// comparison function object between states.
+template <typename S, typename L, typename E>
+class AStarWeightCompare {
+ public:
+  typedef L Less;
+  typedef typename L::Weight Weight;
+  typedef S StateId;
+
+  AStarWeightCompare(const vector<Weight>& weights, const L &less,
+                     const E &estimate)
+      : weights_(weights), less_(less), estimate_(estimate) {}
+
+  bool operator()(const S x, const S y) const {
+    Weight wx = Times(weights_[x], estimate_(x));
+    Weight wy = Times(weights_[y], estimate_(y));
+    return less_(wx, wy);
+  }
+
+ private:
+  const vector<Weight>& weights_;
+  L less_;
+  const E &estimate_;
+};
+
+
+// A* queue discipline, templated on the StateId, Weight and an
+// estimate E of the shortest distance to the final states, is specialized
+// to use the weight's natural order for the comparison function.
+template <typename S, typename W, typename E>
+class NaturalAStarQueue :
+      public ShortestFirstQueue<S, AStarWeightCompare<S, NaturalLess<W>, E> > {
+ public:
+  typedef AStarWeightCompare<S, NaturalLess<W>, E> C;
+
+  NaturalAStarQueue(const vector<W> &distance, const E &estimate) :
+      ShortestFirstQueue<S, C>(C(distance, less_, estimate)) {}
+
+ private:
+  NaturalLess<W> less_;
+};
+
+
+// A state equivalence class is a function object that
+// maps from a state ID to an equivalence class (state) ID.
+// The trivial equivalence class maps a state to itself.
+template <typename S>
+struct TrivialStateEquivClass {
+  S operator()(S s) const { return s; }
+};
+
+
+// Pruning queue discipline: Enqueues a state 's' only when its
+// shortest distance (so far), as specified by 'distance', is less
+// than (as specified by 'comp') the shortest distance Times() the
+// 'threshold' to any state in the same equivalence class, as
+// specified by the function object 'class_func'. The underlying
+// queue discipline is specified by 'queue'. The ownership of 'queue'
+// is given to this class.
+template <typename Q, typename L, typename C>
+class PruneQueue : public QueueBase<typename Q::StateId> {
+ public:
+  typedef typename Q::StateId StateId;
+  typedef typename L::Weight Weight;
+
+  PruneQueue(const vector<Weight> &distance, Q *queue, L comp,
+	     const C &class_func, Weight threshold)
+    : QueueBase<StateId>(OTHER_QUEUE),
+      distance_(distance),
+      queue_(queue),
+      less_(comp),
+      class_func_(class_func),
+      threshold_(threshold) {}
+
+  ~PruneQueue() { delete queue_; }
+
+  StateId Head() const { return queue_->Head(); }
+
+  void Enqueue(StateId s) {
+    StateId c = class_func_(s);
+    if (c >= class_distance_.size())
+      class_distance_.resize(c + 1, Weight::Zero());
+    if (less_(distance_[s], class_distance_[c]))
+      class_distance_[c] = distance_[s];
+
+    // Enqueue only if below threshold limit
+    Weight limit = Times(class_distance_[c], threshold_);
+    if (less_(distance_[s], limit))
+      queue_->Enqueue(s);
+  }
+
+  void Dequeue() { queue_->Dequeue(); }
+
+  void Update(StateId s) {
+    StateId c = class_func_(s);
+    if (less_(distance_[s], class_distance_[c]))
+      class_distance_[c] = distance_[s];
+    queue_->Update(s);
+  }
+
+  bool Empty() const { return queue_->Empty(); }
+  void Clear() { queue_->Clear(); }
+
+ private:
+  // This allows base-class virtual access to non-virtual derived-
+  // class members of the same name. It makes the derived class more
+  // efficient to use but unsafe to further derive.
+  virtual StateId Head_() const { return Head(); }
+  virtual void Enqueue_(StateId s) { Enqueue(s); }
+  virtual void Dequeue_() { Dequeue(); }
+  virtual void Update_(StateId s) { Update(s); }
+  virtual bool Empty_() const { return Empty(); }
+  virtual void Clear_() { return Clear(); }
+
+  const vector<Weight> &distance_;         // shortest distance to state
+  Q *queue_;
+  L less_;
+  const C &class_func_;                    // eqv. class function object
+  Weight threshold_;                       // pruning weight threshold
+  vector<Weight> class_distance_;          // shortest distance to class
+
+  DISALLOW_COPY_AND_ASSIGN(PruneQueue);
+};
+
+
+// Pruning queue discipline (see above) using the weight's natural
+// order for the comparison function. The ownership of 'queue' is
+// given to this class.
+template <typename Q, typename W, typename C>
+class NaturalPruneQueue :
+      public PruneQueue<Q, NaturalLess<W>, C> {
+ public:
+  typedef typename Q::StateId StateId;
+  typedef W Weight;
+
+  NaturalPruneQueue(const vector<W> &distance, Q *queue,
+                    const C &class_func_, Weight threshold) :
+      PruneQueue<Q, NaturalLess<W>, C>(distance, queue, less_,
+                                       class_func_, threshold) {}
+
+ private:
+  NaturalLess<W> less_;
+};
+
 
 }  // namespace fst
 

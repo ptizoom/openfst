@@ -30,19 +30,20 @@ DEFINE_int32(max_length, INT_MAX, "Maximum path length");
 DEFINE_int32(npath, 1, "Number of paths to generate");
 DEFINE_int32(seed, time(0), "Random seed");
 DEFINE_string(select, "uniform", "Selection type: one of: "
-              " \"uniform\", \"log_prob (when appropriate)\"");
+              " \"uniform\", \"log_prob (when appropriate),"
+              " \"fast_log_prob\" (when appropriate)");
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
   using fst::script::FstClass;
 
-  string usage = "Two DFAs are equivalent iff the exit status is zero\n\n";
-  usage += "Usage: ";
+  string usage = "Two DFAs are equivalent iff the exit status is zero.\n\n"
+      "  Usage: ";
   usage += argv[0];
   usage += " in1.fst in2.fst\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc != 3) {
     ShowUsage();
     return 1;
@@ -71,6 +72,8 @@ int main(int argc, char **argv) {
       ras = s::UNIFORM_ARC_SELECTOR;
     } else if (FLAGS_select == "log_prob") {
       ras = s::LOG_PROB_ARC_SELECTOR;
+    } else if (FLAGS_select == "fast_log_prob") {
+      ras = s::FAST_LOG_PROB_ARC_SELECTOR;
     } else {
       LOG(ERROR) << argv[0] << ": Unknown selection type \""
                  << FLAGS_select << "\"\n";

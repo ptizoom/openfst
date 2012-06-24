@@ -28,6 +28,7 @@ using std::vector;
 #include <fst/heap.h>
 #include <fst/shortest-distance.h>
 
+
 namespace fst {
 
 template <class A, class ArcFilter>
@@ -102,10 +103,13 @@ void Prune(MutableFst<Arc> *fst,
   typedef typename Arc::StateId StateId;
 
   if ((Weight::Properties() & (kPath | kCommutative))
-      != (kPath | kCommutative))
-    LOG(FATAL) << "Prune: Weight needs to have the path property and"
+      != (kPath | kCommutative)) {
+    FSTERROR() << "Prune: Weight needs to have the path property and"
                << " be commutative: "
                << Weight::Type();
+    fst->SetProperties(kError, kError);
+    return;
+  }
   StateId ns = fst->NumStates();
   if (ns == 0) return;
   vector<Weight> idistance(ns, Weight::Zero());
@@ -217,10 +221,13 @@ void Prune(const Fst<Arc> &ifst,
   typedef typename Arc::StateId StateId;
 
   if ((Weight::Properties() & (kPath | kCommutative))
-      != (kPath | kCommutative))
-    LOG(FATAL) << "Prune: Weight needs to have the path property and"
+      != (kPath | kCommutative)) {
+    FSTERROR() << "Prune: Weight needs to have the path property and"
                << " be commutative: "
                << Weight::Type();
+    ofst->SetProperties(kError, kError);
+    return;
+  }
   ofst->DeleteStates();
   ofst->SetInputSymbols(ifst.InputSymbols());
   ofst->SetOutputSymbols(ifst.OutputSymbols());
@@ -327,6 +334,6 @@ void Prune(const Fst<Arc> &ifst,
   Prune(ifst, ofst, opts);
 }
 
-} // namespace fst
+}  // namespace fst
 
 #endif // FST_LIB_PRUNE_H_

@@ -23,8 +23,11 @@
 
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
 #include <tr1/unordered_set>
 using std::tr1::unordered_set;
+using std::tr1::unordered_multiset;
+#include <list>
 #include <map>
 #include <set>
 #include <sstream>
@@ -35,8 +38,18 @@ using std::vector;
 
 #include <fst/compat.h>
 #include <fst/types.h>
+
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+//
+// UTILITY FOR ERROR HANDLING
+//
+
+DECLARE_bool(fst_error_fatal);
+
+#define FSTERROR() (FLAGS_fst_error_fatal ? LOG(FATAL) : LOG(ERROR))
 
 namespace fst {
 
@@ -128,6 +141,7 @@ inline istream &ReadType(istream &strm, C<S, T> *c) {    \
 }
 
 READ_STL_SEQ_TYPE(vector);
+READ_STL_SEQ_TYPE(list);
 
 // STL associative container.
 #define READ_STL_ASSOC_TYPE(C)                           \
@@ -207,6 +221,7 @@ inline ostream &WriteType(ostream &strm, const C<S, T> &c) {                 \
 }
 
 WRITE_STL_SEQ_TYPE(vector);
+WRITE_STL_SEQ_TYPE(list);
 
 // STL associative container.
 #define WRITE_STL_ASSOC_TYPE(C)                                              \
@@ -228,16 +243,18 @@ WRITE_STL_ASSOC_TYPE(unordered_map);
 // Utilities for converting between int64 or Weight and string.
 
 int64 StrToInt64(const string &s, const string &src, size_t nline,
-                 bool allow_negative);
+                 bool allow_negative, bool *error = 0);
 
 template <typename Weight>
 Weight StrToWeight(const string &s, const string &src, size_t nline) {
   Weight w;
   istringstream strm(s);
   strm >> w;
-  if (!strm)
-    LOG(FATAL) << "StrToWeight: Bad weight = \"" << s
+  if (!strm) {
+    FSTERROR() << "StrToWeight: Bad weight = \"" << s
                << "\", source = " << src << ", line = " << nline;
+    return Weight::NoWeight();
+  }
   return w;
 }
 
@@ -248,18 +265,22 @@ void WeightToStr(Weight w, string *s) {
   ostringstream strm;
   strm.precision(9);
   strm << w;
-  *s += strm.str();
+  s->append(strm.str().data(), strm.str().size());
 }
 
 // Utilities for reading/writing label pairs
 
+// Returns true on success
 template <typename Label>
-void ReadLabelPairs(const string& filename,
+bool ReadLabelPairs(const string& filename,
                     vector<pair<Label, Label> >* pairs,
                     bool allow_negative = false) {
   ifstream strm(filename.c_str());
-  if (!strm)
-    LOG(FATAL) << "ReadLabelPairs: Can't open file: " << filename;
+
+  if (!strm) {
+    LOG(ERROR) << "ReadLabelPairs: Can't open file: " << filename;
+    return false;
+  }
 
   const int kLineLen = 8096;
   char line[kLineLen];
@@ -272,34 +293,46 @@ void ReadLabelPairs(const string& filename,
     SplitToVector(line, "\n\t ", &col, true);
     if (col.size() == 0 || col[0][0] == '\0')  // empty line
       continue;
-    if (col.size() != 2)
-      LOG(FATAL) << "ReadLabelPairs: Bad number of columns, "
+    if (col.size() != 2) {
+      LOG(ERROR) << "ReadLabelPairs: Bad number of columns, "
                  << "file = " << filename << ", line = " << nline;
+      return false;
+    }
 
-    Label fromlabel = StrToInt64(col[0], filename, nline, allow_negative);
-    Label tolabel   = StrToInt64(col[1], filename, nline, allow_negative);
-    pairs->push_back(make_pair(fromlabel, tolabel));
+    bool err;
+    Label frmlabel = StrToInt64(col[0], filename, nline, allow_negative, &err);
+    if (err) return false;
+    Label tolabel = StrToInt64(col[1], filename, nline, allow_negative, &err);
+    if (err) return false;
+    pairs->push_back(make_pair(frmlabel, tolabel));
   }
+  return true;
 }
 
+// Returns true on success
 template <typename Label>
-void WriteLabelPairs(const string& filename,
+bool WriteLabelPairs(const string& filename,
                      const vector<pair<Label, Label> >& pairs) {
-  ostream *strm = &std::cout;
+  ostream *strm = &cout;
   if (!filename.empty()) {
     strm = new ofstream(filename.c_str());
-    if (!*strm)
-      LOG(FATAL) << "WriteLabelPairs: Can't open file: " << filename;
+    if (!*strm) {
+      LOG(ERROR) << "WriteLabelPairs: Can't open file: " << filename;
+      return false;
+    }
   }
 
   for (ssize_t n = 0; n < pairs.size(); ++n)
     *strm << pairs[n].first << "\t" << pairs[n].second << "\n";
 
-  if (!*strm)
-    LOG(FATAL) << "WriteLabelPairs: Write failed: "
+  if (!*strm) {
+    LOG(ERROR) << "WriteLabelPairs: Write failed: "
                << (filename.empty() ? "standard output" : filename);
-  if (strm != &std::cout)
+    return false;
+  }
+  if (strm != &cout)
     delete strm;
+  return true;
 }
 
 // Utilities for converting a type name to a legal C symbol.
@@ -307,6 +340,71 @@ void WriteLabelPairs(const string& filename,
 void ConvertToLegalCSymbol(string *s);
 
 
-}  // namespace fst;
+//
+// UTILITIES FOR STREAM I/O
+//
+
+bool AlignInput(istream &strm, int align);
+bool AlignOutput(ostream &strm, int align);
+
+//
+// UTILITIES FOR PROTOCOL BUFFER I/O
+//
+
+
+// An associative container for which testing membership is
+// faster than an STL set if members are restricted to an interval
+// that excludes most non-members. A 'Key' must have ==, !=, and < defined.
+// Element 'NoKey' should be a key that marks an uninitialized key and
+// is otherwise unused. 'Find()' returns an STL const_iterator to the match
+// found, otherwise it equals 'End()'.
+template <class Key, Key NoKey>
+class CompactSet {
+public:
+  typedef typename set<Key>::const_iterator const_iterator;
+
+  CompactSet()
+    : min_key_(NoKey),
+      max_key_(NoKey) { }
+
+  CompactSet(const CompactSet<Key, NoKey> &compact_set)
+    : set_(compact_set.set_),
+      min_key_(compact_set.min_key_),
+      max_key_(compact_set.max_key_) { }
+
+  void Insert(Key key) {
+    set_.insert(key);
+    if (min_key_ == NoKey || key < min_key_)
+      min_key_ = key;
+    if (max_key_ == NoKey || max_key_ < key)
+        max_key_ = key;
+  }
+
+  void Clear() {
+    set_.clear();
+    min_key_ = max_key_ = NoKey;
+  }
+
+  const_iterator Find(Key key) const {
+    if (min_key_ == NoKey ||
+        key < min_key_ || max_key_ < key)
+      return set_.end();
+    else
+      return set_.find(key);
+  }
+
+  const_iterator Begin() const { return set_.begin(); }
+
+  const_iterator End() const { return set_.end(); }
+
+private:
+  set<Key> set_;
+  Key min_key_;
+  Key max_key_;
+
+  void operator=(const CompactSet<Key, NoKey> &);  //disallow
+};
+
+}  // namespace fst
 
 #endif  // FST_LIB_UTIL_H__

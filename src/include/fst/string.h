@@ -1,3 +1,4 @@
+
 // string.h
 
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,6 +24,7 @@
 #define FST_LIB_STRING_H_
 
 #include <fst/compact-fst.h>
+#include <fst/icu.h>
 #include <fst/mutable-fst.h>
 
 DECLARE_string(fst_field_separator);
@@ -40,12 +42,14 @@ class StringCompiler {
   enum TokenType { SYMBOL = 1, BYTE = 2, UTF8 = 3 };
 
   StringCompiler(TokenType type, const SymbolTable *syms = 0,
+                 Label unknown_label = kNoLabel,
                  bool allow_negative = false)
-      : token_type_(type), syms_(syms), allow_negative_(allow_negative) {}
+      : token_type_(type), syms_(syms), unknown_label_(unknown_label),
+        allow_negative_(allow_negative) {}
 
   // Compile string 's' into FST 'fst'.
   template <class F>
-  bool operator()(const string &s, F *fst) {
+  bool operator()(const string &s, F *fst) const {
     vector<Label> labels;
     if (!ConvertStringToLabels(s, &labels))
       return false;
@@ -58,7 +62,7 @@ class StringCompiler {
     labels->clear();
     if (token_type_ == BYTE) {
       for (size_t i = 0; i < str.size(); ++i)
-        labels->push_back(str[i]);
+        labels->push_back(static_cast<unsigned char>(str[i]));
     } else if (token_type_ == UTF8) {
       return UTF8StringToLabels(str, labels);
     } else {
@@ -99,18 +103,20 @@ class StringCompiler {
     int64 n;
     if (syms_) {
       n = syms_->Find(s);
+      if ((n == -1) && (unknown_label_ != kNoLabel))
+        n = unknown_label_;
       if (n == -1 || (!allow_negative_ && n < 0)) {
-        LOG(ERROR) << "StringCompiler::ConvertSymbolToLabel: Symbol \"" << s
-                   << "\" is not mapped to any integer label, symbol table = "
-                   << syms_->Name();
+        VLOG(1) << "StringCompiler::ConvertSymbolToLabel: Symbol \"" << s
+                << "\" is not mapped to any integer label, symbol table = "
+                 << syms_->Name();
         return false;
       }
     } else {
       char *p;
       n = strtoll(s, &p, 10);
       if (p < s + strlen(s) || (!allow_negative_ && n < 0)) {
-        LOG(ERROR) << "StringCompiler::ConvertSymbolToLabel: Bad label integer "
-                   << "= \"" << s << "\"";
+        VLOG(1) << "StringCompiler::ConvertSymbolToLabel: Bad label integer "
+                << "= \"" << s << "\"";
         return false;
       }
     }
@@ -120,6 +126,7 @@ class StringCompiler {
 
   TokenType token_type_;     // Token type: symbol, byte or utf8 encoded
   const SymbolTable *syms_;  // Symbol table used when token type is symbol
+  Label unknown_label_;      // Label for token missing from symbol table
   bool allow_negative_;      // Negative labels allowed?
 
   DISALLOW_COPY_AND_ASSIGN(StringCompiler);
@@ -144,7 +151,7 @@ class StringPrinter {
   bool operator()(const Fst<A> &fst, string *output) {
     bool is_a_string = FstToLabels(fst);
     if (!is_a_string) {
-      LOG(ERROR) << "StringPrinter::operator(): Fst is not a string.";
+      VLOG(1) << "StringPrinter::operator(): Fst is not a string.";
       return false;
     }
 
@@ -166,8 +173,8 @@ class StringPrinter {
     } else if (token_type_ == UTF8) {
       return LabelsToUTF8String(labels_, output);
     } else {
-      LOG(ERROR) << "StringPrinter::operator(): Unknown token type: "
-                 << token_type_;
+      VLOG(1) << "StringPrinter::operator(): Unknown token type: "
+              << token_type_;
       return false;
     }
     return true;
@@ -179,16 +186,16 @@ class StringPrinter {
 
     StateId s = fst.Start();
     if (s == kNoStateId) {
-      LOG(ERROR) << "StringPrinter::FstToLabels: Invalid starting state for "
-                 << "string fst.";
+      VLOG(2) << "StringPrinter::FstToLabels: Invalid starting state for "
+              << "string fst.";
       return false;
     }
 
     while (fst.Final(s) == Weight::Zero()) {
       ArcIterator<Fst<A> > aiter(fst, s);
       if (aiter.Done()) {
-        LOG(ERROR) << "StringPrinter::FstToLabels: String fst traversal does "
-                   << "not reach final state.";
+        VLOG(2) << "StringPrinter::FstToLabels: String fst traversal does "
+                << "not reach final state.";
         return false;
       }
 
@@ -197,15 +204,15 @@ class StringPrinter {
 
       s = arc.nextstate;
       if (s == kNoStateId) {
-        LOG(ERROR) << "StringPrinter::FstToLabels: Transition to invalid "
-                   << "state.";
+        VLOG(2) << "StringPrinter::FstToLabels: Transition to invalid "
+                << "state.";
         return false;
       }
 
       aiter.Next();
       if (!aiter.Done()) {
-        LOG(ERROR) << "StringPrinter::FstToLabels: State with multiple "
-                   << "outgoing arcs found.";
+        VLOG(2) << "StringPrinter::FstToLabels: State with multiple "
+                << "outgoing arcs found.";
         return false;
       }
     }
@@ -217,9 +224,9 @@ class StringPrinter {
     if (syms_) {
       string symbol = syms_->Find(lab);
       if (symbol == "") {
-        LOG(ERROR) << "StringPrinter::PrintLabel: Integer " << lab << " is not "
-                   << "mapped to any textual symbol, symbol table = "
-                   << syms_->Name();
+        VLOG(2) << "StringPrinter::PrintLabel: Integer " << lab << " is not "
+                << "mapped to any textual symbol, symbol table = "
+                 << syms_->Name();
         return false;
       }
       ostrm << symbol;

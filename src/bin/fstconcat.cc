@@ -28,14 +28,13 @@ int main(int argc, char **argv) {
   namespace s = fst::script;
   using fst::script::FstClass;
   using fst::script::MutableFstClass;
-  using fst::script::VectorFstClass;
 
   string usage = "Concatenates two FSTs.\n\n  Usage: ";
   usage += argv[0];
   usage += " in1.fst in2.fst [out.fst]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc < 3 || argc > 4) {
     ShowUsage();
     return 1;
@@ -50,22 +49,14 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  FstClass *ifst1 = FstClass::Read(in1_name);
-  if (!ifst1) return 1;
+  MutableFstClass *fst1 = MutableFstClass::Read(in1_name, true);
+  if (!fst1) return 1;
 
-  MutableFstClass *ofst = 0;
-  if (ifst1->Properties(fst::kMutable, false)) {
-    ofst = static_cast<MutableFstClass *>(ifst1);
-  } else {
-    ofst = new VectorFstClass(*ifst1);
-    delete ifst1;
-  }
+  FstClass *fst2 = FstClass::Read(in2_name);
+  if (!fst2) return 1;
 
-  FstClass *ifst2 = FstClass::Read(in2_name);
-  if (!ifst2) return 1;
-
-  s::Concat(ofst, *ifst2);
-  ofst->Write(out_fname);
+  s::Concat(fst1, *fst2);
+  fst1->Write(out_fname);
 
   return 0;
 }

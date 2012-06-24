@@ -25,8 +25,10 @@
 #include <stack>
 #include <vector>
 using std::vector;
+
 #include <fst/arcfilter.h>
 #include <fst/fst.h>
+
 
 namespace fst {
 
@@ -175,7 +177,8 @@ void DfsVisit(const Fst<Arc> &fst, V *visitor, ArcFilter filter) {
     // Find next tree root
     for (root = root == start ? 0 : root + 1;
          root < nstates && state_color[root] != kDfsWhite;
-         ++root);
+         ++root) {
+    }
 
     // Check for a state beyond the largest known state
     if (!expanded && root == nstates) {

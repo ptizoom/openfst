@@ -23,6 +23,7 @@
 
 #include <fst/script/fst-class.h>
 #include <fst/script/script-impl.h>
+#include <fst/script/verify.h>
 #include <fst/util.h>
 
 DEFINE_string(isymbols, "", "Input label symbol table");
@@ -31,20 +32,23 @@ DEFINE_bool(clear_isymbols, false, "Clear input symbol table");
 DEFINE_bool(clear_osymbols, false, "Clear output symbol table");
 DEFINE_string(relabel_ipairs, "", "Input relabel pairs (numeric)");
 DEFINE_string(relabel_opairs, "", "Output relabel pairs (numeric)");
+DEFINE_string(save_isymbols, "", "Save fst file's input symbol table to file");
+DEFINE_string(save_osymbols, "", "Save fst file's output symbol table to file");
 DEFINE_bool(allow_negative_labels, false,
             "Allow negative labels (not recommended; may cause conflicts)");
+DEFINE_bool(verify, false, "Verify fst properities before saving");
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
   using fst::SymbolTable;
 
   string usage = "Performs operations (set, clear, relabel) on the symbol"
-      "tables attached to an FST.\n\n  Usage: ";
+      " tables attached to an FST.\n\n  Usage: ";
   usage += argv[0];
   usage += " [in.fst [out.fst]]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
@@ -53,27 +57,37 @@ int main(int argc, char **argv) {
   string in_fname = argc > 1 && strcmp(argv[1], "-") != 0 ? argv[1] : "";
   string out_fname = argc > 2 ? argv[2] : "";
 
-  s::FstClass *ifst = s::FstClass::Read(in_fname);
-  if (!ifst) return 1;
+  s::MutableFstClass *fst = s::MutableFstClass::Read(in_fname, true);
+  if (!fst) return 1;
 
-  s::MutableFstClass *ofst = 0;
-  if (ifst->Properties(fst::kMutable, false)) {
-    ofst = static_cast<s::MutableFstClass *>(ifst);
-  } else {
-    ofst = new s::VectorFstClass(*ifst);
-    delete ifst;
+  if (!FLAGS_save_isymbols.empty()) {
+    const SymbolTable *isyms = fst->InputSymbols();
+    if (isyms) {
+      isyms->WriteText(FLAGS_save_isymbols);
+    } else {
+      LOG(ERROR) << "save isymbols requested but there are no input symbols.";
+    }
+  }
+
+  if (!FLAGS_save_osymbols.empty()) {
+    const SymbolTable *osyms = fst->OutputSymbols();
+    if (osyms) {
+      osyms->WriteText(FLAGS_save_osymbols);
+    } else {
+      LOG(ERROR) << "save osymbols requested but there are no output symbols.";
+    }
   }
 
   if (FLAGS_clear_isymbols)
-    ofst->SetInputSymbols(0);
+    fst->SetInputSymbols(0);
   else if (!FLAGS_isymbols.empty())
-    ofst->SetInputSymbols(
+    fst->SetInputSymbols(
         SymbolTable::ReadText(FLAGS_isymbols, FLAGS_allow_negative_labels));
 
   if (FLAGS_clear_osymbols)
-    ofst->SetOutputSymbols(0);
+    fst->SetOutputSymbols(0);
   else if (!FLAGS_osymbols.empty())
-    ofst->SetOutputSymbols(
+    fst->SetOutputSymbols(
         SymbolTable::ReadText(FLAGS_osymbols, FLAGS_allow_negative_labels));
 
   if (!FLAGS_relabel_ipairs.empty()) {
@@ -81,8 +95,8 @@ int main(int argc, char **argv) {
     vector<pair<Label, Label> > ipairs;
     fst::ReadLabelPairs(FLAGS_relabel_ipairs, &ipairs,
                             FLAGS_allow_negative_labels);
-    SymbolTable *isyms = RelabelSymbolTable(ofst->InputSymbols(), ipairs);
-    ofst->SetInputSymbols(isyms);
+    SymbolTable *isyms = RelabelSymbolTable(fst->InputSymbols(), ipairs);
+    fst->SetInputSymbols(isyms);
     delete isyms;
   }
 
@@ -91,11 +105,13 @@ int main(int argc, char **argv) {
     vector<pair<Label, Label> > opairs;
     fst::ReadLabelPairs(FLAGS_relabel_opairs, &opairs,
                             FLAGS_allow_negative_labels);
-    SymbolTable *osyms = RelabelSymbolTable(ofst->OutputSymbols(), opairs);
-    ofst->SetOutputSymbols(osyms);
+    SymbolTable *osyms = RelabelSymbolTable(fst->OutputSymbols(), opairs);
+    fst->SetOutputSymbols(osyms);
     delete osyms;
   }
 
-  ofst->Write(out_fname);
+  if (FLAGS_verify && !s::Verify(*fst))
+    return 1;
+  fst->Write(out_fname);
   return 0;
 }

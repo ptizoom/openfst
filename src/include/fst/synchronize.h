@@ -24,8 +24,10 @@
 #include <algorithm>
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
 #include <tr1/unordered_set>
 using std::tr1::unordered_set;
+using std::tr1::unordered_multiset;
 #include <string>
 #include <utility>
 using std::pair; using std::make_pair;
@@ -34,6 +36,7 @@ using std::vector;
 
 #include <fst/cache.h>
 #include <fst/test-properties.h>
+
 
 namespace fst {
 
@@ -47,11 +50,10 @@ class SynchronizeFstImpl
  public:
   using FstImpl<A>::SetType;
   using FstImpl<A>::SetProperties;
-  using FstImpl<A>::Properties;
   using FstImpl<A>::SetInputSymbols;
   using FstImpl<A>::SetOutputSymbols;
 
-  using CacheBaseImpl< CacheState<A> >::AddArc;
+  using CacheBaseImpl< CacheState<A> >::PushArc;
   using CacheBaseImpl< CacheState<A> >::HasArcs;
   using CacheBaseImpl< CacheState<A> >::HasFinal;
   using CacheBaseImpl< CacheState<A> >::HasStart;
@@ -153,6 +155,15 @@ class SynchronizeFstImpl
     return CacheImpl<A>::NumOutputEpsilons(s);
   }
 
+  uint64 Properties() const { return Properties(kFstProperties); }
+
+  // Set error if found; return FST impl properties.
+  uint64 Properties(uint64 mask) const {
+    if ((mask & kError) && fst_->Properties(kError, false))
+      SetProperties(kError, kError);
+    return FstImpl<Arc>::Properties(mask);
+  }
+
   void InitArcIterator(StateId s, ArcIteratorData<A> *data) {
     if (!HasArcs(s))
       Expand(s);
@@ -237,13 +248,13 @@ class SynchronizeFstImpl
           const String *istring = Cdr(e.istring, arc.ilabel);
           const String *ostring = Cdr(e.ostring, arc.olabel);
           StateId d = FindState(Element(arc.nextstate, istring, ostring));
-          AddArc(s, Arc(Car(e.istring, arc.ilabel),
+          PushArc(s, Arc(Car(e.istring, arc.ilabel),
                         Car(e.ostring, arc.olabel), arc.weight, d));
         } else {
           const String *istring = Concat(e.istring, arc.ilabel);
           const String *ostring = Concat(e.ostring, arc.olabel);
           StateId d = FindState(Element(arc.nextstate, istring, ostring));
-          AddArc(s, Arc(0 , 0, arc.weight, d));
+          PushArc(s, Arc(0 , 0, arc.weight, d));
         }
       }
 
@@ -253,7 +264,7 @@ class SynchronizeFstImpl
       const String *istring = Cdr(e.istring);
       const String *ostring = Cdr(e.ostring);
       StateId d = FindState(Element(kNoStateId, istring, ostring));
-      AddArc(s, Arc(Car(e.istring), Car(e.ostring), w, d));
+      PushArc(s, Arc(Car(e.istring), Car(e.ostring), w, d));
     }
     SetArcs(s);
   }

@@ -45,7 +45,7 @@ typedef ArcTpl<LogWeight> LogArc;
 
 template <class A, class C, class U = uint32> class CompactFst;
 template <class A, class U = uint32> class ConstFst;
-template <class A> class EditFst;
+template <class A, class W, class M> class EditFst;
 template <class A> class ExpandedFst;
 template <class A> class Fst;
 template <class A> class MutableFst;
@@ -60,8 +60,9 @@ template <class A> class DeterminizeFst;
 template <class A> class DifferenceFst;
 template <class A> class IntersectFst;
 template <class A> class InvertFst;
-template <class A, class B, class C> class MapFst;
+template <class A, class B, class C> class ArcMapFst;
 template <class A> class ProjectFst;
+template <class A, class B, class S> class RandGenFst;
 template <class A> class RelabelFst;
 template <class A, class T> class ReplaceFst;
 template <class A> class RmEpsilonFst;
@@ -119,6 +120,6 @@ template <class M1, class M2 = M1> class SequenceComposeFilter;
 template <class M1, class M2 = M1> class AltSequenceComposeFilter;
 template <class M1, class M2 = M1> class MatchComposeFilter;
 
-}
+}  // namespace fst
 
 #endif  // FST_LIB_FST_DECL_H__

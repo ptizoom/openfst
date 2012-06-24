@@ -26,9 +26,10 @@
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
 DEFINE_string(map_type, "identity",
-              "Map operation, one of: \"identity\", \"invert\", "
-              " \"plus (--weight)\", \"quantize (--delta)\", \"rmweight\", "
-              "\"superfinal\", \"times (--weight)\"\n");
+              "Map operation, one of: \"arc_sum\", \"identity\", \"invert\", "
+              "\"plus (--weight)\", \"quantize (--delta)\", \"rmweight\", "
+              "\"superfinal\", \"times (--weight)\", \"to_log\", \"to_log64\", "
+              "\"to_standard\"");
 DEFINE_string(weight, "", "Weight parameter");
 
 int main(int argc, char **argv) {
@@ -42,7 +43,7 @@ int main(int argc, char **argv) {
   usage += " [in.fst [out.fst]]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
@@ -54,42 +55,41 @@ int main(int argc, char **argv) {
   FstClass *ifst = FstClass::Read(in_name);
   if (!ifst) return 1;
 
-  MutableFstClass *ofst = 0;
-  if (ifst->Properties(fst::kMutable, false)) {
-    ofst = static_cast<MutableFstClass *>(ifst);
-  } else {
-    ofst = new VectorFstClass(*ifst);
-    delete ifst;
-  }
+  s::WeightClass w = !FLAGS_weight.empty() ?
+      s::WeightClass(ifst->WeightType(), FLAGS_weight) :
+      (FLAGS_map_type == "times" ?
+       s::WeightClass::One() : s::WeightClass::Zero());
 
-  fst::MapType mt;
-  s::WeightClass w = s::WeightClass::Zero();
-
-  if (FLAGS_map_type == "identity") {
-    mt = fst::IDENTITY_MAPPER;
+  s::MapType mt;
+  if (FLAGS_map_type == "arc_sum") {
+    mt = s::ARC_SUM_MAPPER;
+  } else if (FLAGS_map_type == "identity") {
+    mt = s::IDENTITY_MAPPER;
   } else if (FLAGS_map_type == "invert") {
-    mt = fst::INVERT_MAPPER;
+    mt = s::INVERT_MAPPER;
   } else if (FLAGS_map_type == "plus") {
-    w = FLAGS_weight.empty() ? s::WeightClass::Zero() :
-        s::WeightClass(ifst->WeightType(), FLAGS_weight);
-    mt = fst::PLUS_MAPPER;
+    mt = s::PLUS_MAPPER;
   } else if (FLAGS_map_type == "quantize") {
-    mt = fst::QUANTIZE_MAPPER;
+    mt = s::QUANTIZE_MAPPER;
   } else if (FLAGS_map_type == "rmweight") {
-    mt = fst::RMWEIGHT_MAPPER;
+    mt = s::RMWEIGHT_MAPPER;
   } else if (FLAGS_map_type == "superfinal") {
-    mt = fst::SUPERFINAL_MAPPER;
+    mt = s::SUPERFINAL_MAPPER;
   } else if (FLAGS_map_type == "times") {
-    w = FLAGS_weight.empty() ? s::WeightClass::One() :
-        s::WeightClass(ifst->WeightType(), FLAGS_weight);
-    mt = fst::TIMES_MAPPER;
+    mt = s::TIMES_MAPPER;
+  } else if (FLAGS_map_type == "to_log") {
+    mt = s::TO_LOG_MAPPER;
+  } else if (FLAGS_map_type == "to_log64") {
+    mt = s::TO_LOG64_MAPPER;
+  } else if (FLAGS_map_type == "to_standard") {
+    mt = s::TO_STD_MAPPER;
   } else {
     LOG(ERROR) << argv[0] << ": Unknown map type \""
                << FLAGS_map_type << "\"\n";
     return 1;
   }
 
-  s::Map(ofst, mt, FLAGS_delta, w);
+  FstClass *ofst = s::Map(*ifst, mt, FLAGS_delta, w);
 
   ofst->Write(out_name);
 

@@ -22,8 +22,11 @@
 #ifndef FST_LIB_EXPANDED_FST_H__
 #define FST_LIB_EXPANDED_FST_H__
 
+#include <sys/types.h>
 #include <string>
+
 #include <fst/fst.h>
+
 
 namespace fst {
 
@@ -79,11 +82,13 @@ class ExpandedFst : public Fst<A> {
       }
       return Read(strm, FstReadOptions(filename));
     } else {
-      return Read(std::cin, FstReadOptions("standard input"));
+      return Read(cin, FstReadOptions("standard input"));
     }
   }
 };
 
+
+namespace internal {
 
 //  ExpandedFst<A> case - abstract methods.
 template <class A> inline
@@ -106,6 +111,8 @@ ssize_t NumOutputEpsilons(const ExpandedFst<A> &fst, typename A::StateId s) {
   return fst.NumOutputEpsilons(s);
 }
 
+}  // namespace internal
+
 
 // A useful alias when using StdArc.
 typedef ExpandedFst<StdArc> StdExpandedFst;
@@ -114,7 +121,6 @@ typedef ExpandedFst<StdArc> StdExpandedFst;
 // This is a helper class template useful for attaching an ExpandedFst
 // interface to its implementation, handling reference counting. It
 // delegates to ImplToFst the handling of the Fst interface methods.
-// It assumes the ExpandedFst implementation has a Write() method.
 template < class I, class F = ExpandedFst<typename I::Arc> >
 class ImplToExpandedFst : public ImplToFst<I, F> {
  public:
@@ -125,26 +131,6 @@ class ImplToExpandedFst : public ImplToFst<I, F> {
   using ImplToFst<I, F>::GetImpl;
 
   virtual StateId NumStates() const { return GetImpl()->NumStates(); }
-
-  // Write to an output stream; return false on error.
-  virtual bool Write(ostream &strm, const FstWriteOptions &opts) const {
-    return GetImpl()->Write(strm, opts);
-  }
-
-  // Write to a file; return false on error.
-  // Empty filename writes to standard output.
-  virtual bool Write(const string &filename) const {
-    if (!filename.empty()) {
-      ofstream strm(filename.c_str(), ofstream::out | ofstream::binary);
-      if (!strm) {
-        LOG(ERROR) << "ExpandedFst::Write: Can't open file: " << filename;
-        return false;
-      }
-      return Write(strm, FstWriteOptions(filename));
-    } else {
-      return Write(std::cout, FstWriteOptions("standard output"));
-    }
-  }
 
  protected:
   ImplToExpandedFst() : ImplToFst<I, F>() {}
@@ -168,7 +154,7 @@ class ImplToExpandedFst : public ImplToFst<I, F> {
       }
       return I::Read(strm, FstReadOptions(filename));
     } else {
-      return I::Read(std::cin, FstReadOptions("standard input"));
+      return I::Read(cin, FstReadOptions("standard input"));
     }
   }
 
@@ -177,11 +163,11 @@ class ImplToExpandedFst : public ImplToFst<I, F> {
   ImplToExpandedFst<I, F> &operator=(const ImplToExpandedFst<I, F> &fst);
 
   ImplToExpandedFst<I, F> &operator=(const Fst<Arc> &fst) {
-    LOG(FATAL) << "ImplToExpandedFst: Assignment operator disallowed";
+    FSTERROR() << "ImplToExpandedFst: Assignment operator disallowed";
+    GetImpl()->SetProperties(kError, kError);
     return *this;
   }
 };
-
 
 // Function to return the number of states in an FST, counting them
 // if necessary.

@@ -23,11 +23,13 @@
 
 #include <tr1/unordered_set>
 using std::tr1::unordered_set;
+using std::tr1::unordered_multiset;
 #include <vector>
 using std::vector;
 
 #include <fst/connect.h>
 #include <fst/mutable-fst.h>
+
 
 namespace fst {
 
@@ -100,6 +102,6 @@ void RmFinalEpsilon(MutableFst<A>* fst) {
   Connect(fst);
 }
 
-}
+}  // namespace fst
 
 #endif  // FST_LIB_RMFINALEPSILON_H__

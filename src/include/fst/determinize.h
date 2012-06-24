@@ -26,6 +26,7 @@
 #include <climits>
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
 #include <map>
 #include <fst/slist.h>
 #include <string>
@@ -34,9 +35,10 @@ using std::vector;
 
 #include <fst/cache.h>
 #include <fst/factor-weight.h>
-#include <fst/map.h>
+#include <fst/arc-map.h>
 #include <fst/prune.h>
 #include <fst/test-properties.h>
+
 
 namespace fst {
 
@@ -70,19 +72,20 @@ class LabelCommonDivisor {
     StringWeightIterator<L, S> iter1(w1);
     StringWeightIterator<L, S> iter2(w2);
 
-    if (!(StringWeight<L, S>::Properties() & kLeftSemiring))
-      LOG(FATAL) << "LabelCommonDivisor: Weight needs to be left semiring";
-
-    if (w1.Size() == 0 || w2.Size() == 0)
+    if (!(StringWeight<L, S>::Properties() & kLeftSemiring)) {
+      FSTERROR() << "LabelCommonDivisor: Weight needs to be left semiring";
+      return Weight::NoWeight();
+    } else if (w1.Size() == 0 || w2.Size() == 0) {
       return Weight::One();
-    else if (w1 == Weight::Zero())
+    } else if (w1 == Weight::Zero()) {
       return Weight(iter2.Value());
-    else if (w2 == Weight::Zero())
+    } else if (w2 == Weight::Zero()) {
       return Weight(iter1.Value());
-    else if (iter1.Value() == iter2.Value())
+    } else if (iter1.Value() == iter2.Value()) {
       return Weight(iter1.Value());
-    else
+    } else {
       return Weight::One();
+    }
   }
 };
 
@@ -220,7 +223,7 @@ class DeterminizeFstImplBase : public CacheImpl<A> {
 
   virtual Weight ComputeFinal(StateId s) = 0;
 
-  const Fst<A> &GetFst() { return *fst_; }
+  const Fst<A> &GetFst() const { return *fst_; }
 
  private:
   const Fst<A> *fst_;            // Input Fst
@@ -234,6 +237,7 @@ class DeterminizeFstImplBase : public CacheImpl<A> {
 template <class A, class D>
 class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
  public:
+  using FstImpl<A>::SetProperties;
   using DeterminizeFstImplBase<A>::GetFst;
   using DeterminizeFstImplBase<A>::SetArcs;
 
@@ -261,11 +265,15 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
         out_dist_(out_dist),
         common_divisor_(common_divisor),
         subset_hash_(0, SubsetKey(), SubsetEqual(&elements_)) {
-    if (!fst.Properties(kAcceptor, true))
-     LOG(FATAL)  << "DeterminizeFst: argument not an acceptor";
-    if (!(Weight::Properties() & kLeftSemiring))
-      LOG(FATAL) << "DeterminizeFst: Weight needs to be left distributive: "
+    if (!fst.Properties(kAcceptor, true)) {
+      FSTERROR()  << "DeterminizeFst: argument not an acceptor";
+      SetProperties(kError, kError);
+    }
+    if (!(Weight::Properties() & kLeftSemiring)) {
+      FSTERROR() << "DeterminizeFst: Weight needs to be left distributive: "
                  << Weight::Type();
+      SetProperties(kError, kError);
+    }
     if (out_dist_)
       out_dist_->clear();
   }
@@ -273,12 +281,14 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
   DeterminizeFsaImpl(const DeterminizeFsaImpl<A, D> &impl)
       : DeterminizeFstImplBase<A>(impl),
         delta_(impl.delta_),
-        in_dist_(impl.in_dist_),
-        out_dist_(impl.out_dist_),
+        in_dist_(0),
+        out_dist_(0),
         common_divisor_(impl.common_divisor_),
         subset_hash_(0, SubsetKey(), SubsetEqual(&elements_)) {
-    if (out_dist_)
-      LOG(FATAL) << "DeterminizeFsaImpl: cannot copy with out_dist vector";
+    if (impl.out_dist_) {
+      FSTERROR() << "DeterminizeFsaImpl: cannot copy with out_dist vector";
+      SetProperties(kError, kError);
+    }
   }
 
   virtual ~DeterminizeFsaImpl() {
@@ -288,6 +298,15 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
 
   virtual DeterminizeFsaImpl<A, D> *Copy() {
     return new DeterminizeFsaImpl<A, D>(*this);
+  }
+
+  uint64 Properties() const { return Properties(kFstProperties); }
+
+  // Set error if found; return FST impl properties.
+  uint64 Properties(uint64 mask) const {
+    if ((mask & kError) && (GetFst().Properties(kError, false)))
+      SetProperties(kError, kError);
+    return FstImpl<A>::Properties(mask);
   }
 
   virtual StateId ComputeStart() {
@@ -309,7 +328,9 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
       Element &element = *siter;
       final = Plus(final, Times(element.weight,
                                 GetFst().Final(element.state_id)));
-      }
+      if (!final.Member())
+        SetProperties(kError, kError);
+    }
     return final;
   }
 
@@ -419,6 +440,8 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
         // Found duplicate state: sums state weight and deletes dup.
         matching_element->weight = Plus(matching_element->weight,
                                         dest_element.weight);
+        if (!matching_element->weight.Member())
+          SetProperties(kError, kError);
         ++diter;
         dest_subset->erase_after(oiter);
       } else {
@@ -443,7 +466,7 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
     }
 
     arc.nextstate = FindState(dest_subset);
-    CacheImpl<A>::AddArc(s, arc);
+    CacheImpl<A>::PushArc(s, arc);
   }
 
   // Comparison object for hashing Subset(s). Subsets are not sorted in this
@@ -509,8 +532,8 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
            iter != subset->end();
            ++iter) {
         const Element &element = *iter;
-        const int lshift = 5;
-        const int rshift = CHAR_BIT * sizeof(size_t) - 5;
+        int lshift = element.state_id % (CHAR_BIT * sizeof(size_t) - 1) + 1;
+        int rshift = CHAR_BIT * sizeof(size_t) - lshift;
         size_t n = element.state_id;
         hash ^= n << lshift ^ n >> rshift ^ element.weight.Hash();
       }
@@ -549,6 +572,7 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
 template <class A, StringType S>
 class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
  public:
+  using FstImpl<A>::SetProperties;
   using DeterminizeFstImplBase<A>::GetFst;
   using CacheBaseImpl< CacheState<A> >::GetCacheGc;
   using CacheBaseImpl< CacheState<A> >::GetCacheLimit;
@@ -561,8 +585,8 @@ class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
   typedef FromGallicMapper<A, S> FromMapper;
 
   typedef typename ToMapper::ToArc ToArc;
-  typedef MapFst<A, ToArc, ToMapper> ToFst;
-  typedef MapFst<ToArc, A, FromMapper> FromFst;
+  typedef ArcMapFst<A, ToArc, ToMapper> ToFst;
+  typedef ArcMapFst<ToArc, A, FromMapper> FromFst;
 
   typedef GallicCommonDivisor<Label, Weight, S> CommonDivisor;
   typedef GallicFactor<Label, Weight, S> FactorIterator;
@@ -587,6 +611,16 @@ class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
     return new DeterminizeFstImpl<A, S>(*this);
   }
 
+  uint64 Properties() const { return Properties(kFstProperties); }
+
+  // Set error if found; return FST impl properties.
+  uint64 Properties(uint64 mask) const {
+    if ((mask & kError) && (GetFst().Properties(kError, false) ||
+                            from_fst_->Properties(kError, false)))
+      SetProperties(kError, kError);
+    return FstImpl<A>::Properties(mask);
+  }
+
   virtual StateId ComputeStart() { return from_fst_->Start(); }
 
   virtual Weight ComputeFinal(StateId s) { return from_fst_->Final(s); }
@@ -595,7 +629,7 @@ class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
     for (ArcIterator<FromFst> aiter(*from_fst_, s);
          !aiter.Done();
          aiter.Next())
-      CacheImpl<A>::AddArc(s, aiter.Value());
+      CacheImpl<A>::PushArc(s, aiter.Value());
     CacheImpl<A>::SetArcs(s);
   }
 
@@ -670,9 +704,11 @@ class DeterminizeFst : public ImplToFst< DeterminizeFstImplBase<A> >  {
       const Fst<A> &fst,
       const vector<Weight> &in_dist, vector<Weight> *out_dist,
       const DeterminizeFstOptions<A> &opts = DeterminizeFstOptions<A>()) {
-    if (!fst.Properties(kAcceptor, true))
-      LOG(FATAL) << "DeterminizeFst:"
+    if (!fst.Properties(kAcceptor, true)) {
+      FSTERROR() << "DeterminizeFst:"
                  << " distance to final states computed for acceptors only";
+      GetImpl()->SetProperties(kError, kError);
+    }
     typedef DefaultCommonDivisor<Weight> D;
     SetImpl(new DeterminizeFsaImpl<A, D>(fst, D(), &in_dist, out_dist, opts));
   }

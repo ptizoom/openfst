@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
   usage += " in.fst in.pdt [out.pdt]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc < 3 || argc > 4) {
     ShowUsage();
     return 1;
@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
 
   string in1_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
   string in2_name = strcmp(argv[2], "-") == 0 ? "" : argv[2];
+  string out_name = argc > 3 ? argv[3] : "";
 
   if (in1_name.empty() && in2_name.empty()) {
     LOG(ERROR) << argv[0] << ": Can't take both inputs from standard input.";
@@ -75,7 +76,7 @@ int main(int argc, char **argv) {
 
   if (FLAGS_connect)
     s::Connect(&ofst);
-  ofst.Write(argc > 3 ? argv[3] : "");
+  ofst.Write(out_name);
 
   return 0;
 }

@@ -27,6 +27,7 @@ using std::vector;
 
 #include <fst/cache.h>
 
+
 namespace fst {
 
 // Reverses an FST. The reversed result is written to an output
@@ -47,6 +48,8 @@ void Reverse(const Fst<Arc> &ifst, MutableFst<RevArc> *ofst) {
   ofst->DeleteStates();
   ofst->SetInputSymbols(ifst.InputSymbols());
   ofst->SetOutputSymbols(ifst.OutputSymbols());
+  if (ifst.Properties(kExpanded, false))
+    ofst->ReserveStates(CountStates(ifst) + 1);
   StateId istart = ifst.Start();
   StateId ostart = ofst->AddState();
   ofst->SetStart(ostart);

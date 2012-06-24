@@ -56,9 +56,9 @@ struct WeightClassImpl : public WeightImplBase {
   }
 
   virtual string to_string() const {
-    ostringstream s;
-    s << weight;
-    return s.str();
+    string str;
+    WeightToStr(weight, &str);
+    return str;
   }
 
   virtual bool operator == (const WeightImplBase &other) const {
@@ -100,12 +100,14 @@ class WeightClass {
 
   string to_string() const {
     switch (element_type_) {
-      case ZERO: return "ZERO";
-      case ONE: return "ONE";
-      case OTHER: return impl_->to_string();
+      case ZERO:
+        return "ZERO";
+      case ONE:
+        return "ONE";
+      default:
+      case OTHER:
+        return impl_->to_string();
     }
-
-    CHECK(false);
   }
 
   bool operator == (const WeightClass &other) const {

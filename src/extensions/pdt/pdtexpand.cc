@@ -17,7 +17,7 @@
 // Modified: jpr@google.com (Jake Ratkiewicz) to use FstClass
 //
 // \file
-// Expands a PDT and an FST.
+// Expands a (bounded-stack) PDT as an FST.
 //
 
 #include <fst/extensions/pdt/pdtscript.h>
@@ -25,23 +25,28 @@
 
 DEFINE_string(pdt_parentheses, "", "PDT parenthesis label pairs.");
 DEFINE_bool(connect, true, "Trim output");
+DEFINE_bool(keep_parentheses, false, "Keep PDT parentheses in result.");
+DEFINE_string(weight, "", "Weight threshold");
 
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
 
-  string usage = "Expand a PDT and an FST.\n\n  Usage: ";
+  string usage = "Expand a (bounded-stack) PDT as an FST.\n\n  Usage: ";
   usage += argv[0];
   usage += " in.pdt [out.fst]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc > 3) {
     ShowUsage();
     return 1;
   }
 
-  s::FstClass *ifst = s::FstClass::Read(argv[1]);
+  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
+  string out_name = argc > 2 ? argv[2] : "";
+
+  s::FstClass *ifst = s::FstClass::Read(in_name);
   if (!ifst) return 1;
 
   if (FLAGS_pdt_parentheses.empty()) {
@@ -52,10 +57,15 @@ int main(int argc, char **argv) {
   vector<pair<int64, int64> > parens;
   fst::ReadLabelPairs(FLAGS_pdt_parentheses, &parens, false);
 
-  s::VectorFstClass ofst(ifst->ArcType());
-  s::PdtExpand(*ifst, parens, &ofst, FLAGS_connect);
+  s::WeightClass weight_threshold = FLAGS_weight.empty() ?
+      s::WeightClass::Zero() :
+      s::WeightClass(ifst->WeightType(), FLAGS_weight);
 
-  ofst.Write(argc > 2 ? argv[2] : "");
+  s::VectorFstClass ofst(ifst->ArcType());
+  s::PdtExpand(*ifst, parens, &ofst, s::PdtExpandOptions(
+      FLAGS_connect, FLAGS_keep_parentheses, weight_threshold));
+
+  ofst.Write(out_name);
 
   return 0;
 }

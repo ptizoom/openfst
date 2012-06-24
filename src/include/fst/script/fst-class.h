@@ -24,6 +24,7 @@
 #include <fst/vector-fst.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 // Classes to support "boxing" all existing types of FST arcs in a single
 // FstClass which hides the arc types. This allows clients to load
@@ -37,11 +38,11 @@ namespace fst {
 namespace script {
 
 //
-// Abstract base class defining the set of functionalities
-// implemented in all impls, and passed through by all bases
-// Below FstClassBase the class hierarchy bifurcates; FCImplBase serves
-// as the base class for all implementations (of which FstContainer is
-// currently the only one) and FstClass serves as the base class for all
+// Abstract base class defining the set of functionalities implemented
+// in all impls, and passed through by all bases Below FstClassBase
+// the class hierarchy bifurcates; FstClassImplBase serves as the base
+// class for all implementations (of which FstClassImpl is currently
+// the only one) and FstClass serves as the base class for all
 // interfaces.
 //
 class FstClassBase {
@@ -52,6 +53,7 @@ class FstClassBase {
   virtual const SymbolTable *InputSymbols() const = 0;
   virtual const SymbolTable *OutputSymbols() const = 0;
   virtual void Write(const string& fname) const = 0;
+  virtual void Write(ostream &ostr, const FstWriteOptions &opts) const = 0;
   virtual uint64 Properties(uint64 mask, bool test) const = 0;
   virtual ~FstClassBase() { }
 };
@@ -67,10 +69,10 @@ class FstClassImplBase : public FstClassBase {
 
 //
 // CONTAINER CLASS
-// Wraps an old-style Fst<Arc>, hiding its arc type
-// Whether this Fst<Arc> pointer refers to a special kind of FST
-// (e.g. a MutableFst) is known by the type of interface class that
-// owns the pointer to this container.
+// Wraps an Fst<Arc>, hiding its arc type. Whether this Fst<Arc>
+// pointer refers to a special kind of FST (e.g. a MutableFst) is
+// known by the type of interface class that owns the pointer to this
+// container.
 //
 
 template<class Arc>
@@ -114,11 +116,17 @@ class FstClassImpl : public FstClassImplBase {
     impl_->Write(fname);
   }
 
+  virtual void Write(ostream &ostr, const FstWriteOptions &opts) const {
+    impl_->Write(ostr, opts);
+  }
+
   virtual uint64 Properties(uint64 mask, bool test) const {
     return impl_->Properties(mask, test);
   }
 
   virtual ~FstClassImpl() { delete impl_; }
+
+  Fst<Arc> *GetImpl() const { return impl_; }
 
   Fst<Arc> *GetImpl() { return impl_; }
 
@@ -141,7 +149,10 @@ class FstClass : public FstClassBase {
   template<class Arc>
   static FstClass *Read(istream &stream,
                         const FstReadOptions &opts) {
-    CHECK(opts.header);
+    if (!opts.header) {
+      FSTERROR() << "FstClass::Read: options header not specified";
+      return 0;
+    }
     const FstHeader &hdr = *opts.header;
 
     if (hdr.Properties() & kMutable) {
@@ -151,12 +162,24 @@ class FstClass : public FstClassBase {
     }
   }
 
+  FstClass() : impl_(NULL) {
+  }
+
   template<class Arc>
-  explicit FstClass(Fst<Arc> *fst) : impl_(new FstClassImpl<Arc>(fst)) { }
+  explicit FstClass(Fst<Arc> *fst) : impl_(new FstClassImpl<Arc>(fst)) {
+  }
 
   explicit FstClass(const FstClass &other) : impl_(other.impl_->Copy()) { }
 
+  FstClass &operator=(const FstClass &other) {
+    delete impl_;
+    impl_ = other.impl_->Copy();
+    return *this;
+  }
+
   static FstClass *Read(const string &fname);
+
+  static FstClass *Read(istream &istr, const string &source);
 
   virtual const string &ArcType() const {
     return impl_->ArcType();
@@ -180,6 +203,10 @@ class FstClass : public FstClassBase {
 
   virtual void Write(const string &fname) const {
     impl_->Write(fname);
+  }
+
+  virtual void Write(ostream &ostr, const FstWriteOptions &opts) const {
+    impl_->Write(ostr, opts);
   }
 
   virtual uint64 Properties(uint64 mask, bool test) const {
@@ -211,6 +238,8 @@ class FstClass : public FstClassBase {
                << "particular arc type.";
     return 0;
   }
+
+
  protected:
   explicit FstClass(FstClassImplBase *impl) : impl_(impl) { }
 
@@ -230,7 +259,12 @@ class FstClass : public FstClassBase {
     }
   }
 
+  FstClassImplBase *GetImpl() const { return impl_; }
+
   FstClassImplBase *GetImpl() { return impl_; }
+
+//  friend ostream &operator<<(ostream&, const FstClass&);
+
  private:
   FstClassImplBase *impl_;
 };
@@ -256,20 +290,25 @@ class MutableFstClass : public FstClass {
   template<class Arc>
   static MutableFstClass *Read(istream &stream,
                                const FstReadOptions &opts) {
-    CHECK(opts.header);
-    const FstHeader &hdr = *opts.header;
-
-    if (hdr.Properties() & kMutable) {
-      MutableFst<Arc> *f = MutableFst<Arc>::Read(stream, opts);
-      MutableFstClass *retval = new MutableFstClass(f);
-      delete f;
-      return retval;
-    } else {
-      LOG(ERROR) << "Attempt to read a MutableFstClass from a file that doesn't"
-                 << " contain a mutable FST type.";
+    MutableFst<Arc> *mfst = MutableFst<Arc>::Read(stream, opts);
+    if (!mfst) {
       return 0;
+    } else {
+      MutableFstClass *retval = new MutableFstClass(mfst);
+      delete mfst;
+      return retval;
     }
   }
+
+  virtual void Write(const string &fname) const {
+    GetImpl()->Write(fname);
+  }
+
+  virtual void Write(ostream &ostr, const FstWriteOptions &opts) const {
+    GetImpl()->Write(ostr, opts);
+  }
+
+  static MutableFstClass *Read(const string &fname, bool convert = false);
 
   virtual void SetInputSymbols(SymbolTable *is) {
     GetImpl()->SetInputSymbols(is);
@@ -321,6 +360,8 @@ class VectorFstClass : public MutableFstClass {
     }
   }
 
+  static VectorFstClass *Read(const string &fname);
+
   // Converter / creator for known arc types
   template<class Arc>
   static FstClassImplBase *Convert(const FstClass &other) {
@@ -336,6 +377,4 @@ class VectorFstClass : public MutableFstClass {
 
 }  // namespace script
 }  // namespace fst
-
-
 #endif  // FST_SCRIPT_FST_CLASS_H_

@@ -25,11 +25,11 @@
 #include <fst/script/union.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 int main(int argc, char **argv) {
   using fst::script::FstClass;
   using fst::script::MutableFstClass;
-  using fst::script::VectorFstClass;
   using fst::script::Union;
 
   string usage = "Creates the union of two FSTs.\n\n  Usage: ";
@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
   usage += " in1.fst in2.fst [out.fst]\n";
 
   std::set_new_handler(FailedNewHandler);
-  SetFlags(usage.c_str(), &argc, &argv, true);
+  SET_FLAGS(usage.c_str(), &argc, &argv, true);
   if (argc < 3 || argc > 4) {
     ShowUsage();
     return 1;
@@ -53,26 +53,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  FstClass *ifst1 = FstClass::Read(in1_name);
-  if (!ifst1) {
-    return 0;
-  }
+  MutableFstClass *fst1 = MutableFstClass::Read(in1_name, true);
+  if (!fst1) return 1;
 
-  MutableFstClass *ofst = 0;
-  if (ifst1->Properties(fst::kMutable, false)) {
-    ofst = static_cast<MutableFstClass *>(ifst1);
-  } else {
-    ofst = new VectorFstClass(*ifst1);
-    delete ifst1;
-  }
-
-  FstClass *ifst2 = FstClass::Read(in2_name);
-  if (!ifst2) {
+  FstClass *fst2 = FstClass::Read(in2_name);
+  if (!fst2) {
     return 1;
   }
 
-  Union(ofst, *ifst2);
-  ofst->Write(out_name);
+  Union(fst1, *fst2);
+  fst1->Write(out_name);
 
   return 0;
 }

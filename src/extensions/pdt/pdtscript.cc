@@ -28,8 +28,10 @@ using std::pair; using std::make_pair;
 
 #include <fst/extensions/pdt/compose.h>
 #include <fst/extensions/pdt/expand.h>
-#include <fst/extensions/pdt/replace.h>
 #include <fst/extensions/pdt/pdtscript.h>
+#include <fst/extensions/pdt/replace.h>
+#include <fst/extensions/pdt/reverse.h>
+#include <fst/extensions/pdt/shortest-path.h>
 #include <fst/script/script-impl.h>
 
 namespace fst {
@@ -51,10 +53,16 @@ void PdtCompose(const FstClass &ifst1,
 
 void PdtExpand(const FstClass &ifst,
                const vector<pair<int64, int64> > &parens,
-               MutableFstClass *ofst, bool connect) {
-  PdtExpandArgs args(ifst, parens, ofst, connect);
+               MutableFstClass *ofst, const PdtExpandOptions &opts) {
+  PdtExpandArgs args(ifst, parens, ofst, opts);
 
   Apply<Operation<PdtExpandArgs> >("PdtExpand", ifst.ArcType(), &args);
+}
+
+void PdtExpand(const FstClass &ifst,
+               const vector<pair<int64, int64> > &parens,
+               MutableFstClass *ofst, bool connect) {
+  PdtExpand(ifst, parens, ofst, PdtExpandOptions(connect));
 }
 
 void PdtReplace(const vector<pair<int64, const FstClass*> > &fst_tuples,
@@ -73,10 +81,35 @@ void PdtReplace(const vector<pair<int64, const FstClass*> > &fst_tuples,
   Apply<Operation<PdtReplaceArgs> >("PdtReplace", ofst->ArcType(), &args);
 }
 
+void PdtReverse(const FstClass &ifst,
+                const vector<pair<int64, int64> > &parens,
+                MutableFstClass *ofst) {
+  PdtReverseArgs args(ifst, parens, ofst);
+
+  Apply<Operation<PdtReverseArgs> >("PdtReverse", ifst.ArcType(), &args);
+}
+
+void PdtShortestPath(const FstClass &ifst,
+                     const vector<pair<int64, int64> > &parens,
+                     MutableFstClass *ofst,
+                     const PdtShortestPathOptions &opts) {
+  PdtShortestPathArgs args(ifst, parens, ofst, opts);
+
+  Apply<Operation<PdtShortestPathArgs> >("PdtShortestPath",
+                                         ifst.ArcType(), &args);
+}
+
+void PrintPdtInfo(const FstClass &ifst,
+                  const vector<pair<int64, int64> > &parens) {
+  PrintPdtInfoArgs args(ifst, parens);
+  Apply<Operation<PrintPdtInfoArgs> >("PrintPdtInfo", ifst.ArcType(), &args);
+}
+
 // Register operations for common arc types.
 
 REGISTER_FST_PDT_OPERATIONS(StdArc);
 REGISTER_FST_PDT_OPERATIONS(LogArc);
+REGISTER_FST_PDT_OPERATIONS(Log64Arc);
 
 }  // namespace script
 }  // namespace fst

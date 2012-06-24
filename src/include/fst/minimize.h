@@ -31,7 +31,6 @@
 using std::vector;
 
 #include <fst/arcsort.h>
-#include <fst/arcmerge.h>
 #include <fst/connect.h>
 #include <fst/dfs-visit.h>
 #include <fst/encode.h>
@@ -42,6 +41,8 @@ using std::vector;
 #include <fst/push.h>
 #include <fst/queue.h>
 #include <fst/reverse.h>
+#include <fst/state-map.h>
+
 
 namespace fst {
 
@@ -485,8 +486,11 @@ void MergeStates(
 template <class A>
 void AcceptorMinimize(MutableFst<A>* fst) {
   typedef typename A::StateId StateId;
-  if (!(fst->Properties(kAcceptor | kUnweighted, true)))
-    LOG(FATAL) << "Input Fst is not an unweighted acceptor";
+  if (!(fst->Properties(kAcceptor | kUnweighted, true))) {
+    FSTERROR() << "FST is not an unweighted acceptor";
+    fst->SetProperties(kError, kError);
+    return;
+  }
 
   // connect fst before minimization, handles disconnected states
   Connect(fst);
@@ -504,12 +508,11 @@ void AcceptorMinimize(MutableFst<A>* fst) {
     VLOG(2) << "Cyclic Minimization";
     CyclicMinimizer<A, LifoQueue<StateId> > minimizer(*fst);
     MergeStates(minimizer.partition(), fst);
-    // Sort arcs before merging
-    ArcSort(fst, ILabelCompare<A>());
   }
 
   // Merge in appropriate semiring
-  ArcMerge(fst);
+  ArcUniqueMapper<A> mapper(*fst);
+  StateMap(fst, mapper);
 }
 
 
@@ -530,16 +533,19 @@ void Minimize(MutableFst<A>* fst,
               float delta = kDelta) {
   uint64 props = fst->Properties(kAcceptor | kIDeterministic|
                                  kWeighted | kUnweighted, true);
-  if (!(props & kIDeterministic))
-    LOG(FATAL) << "Input Fst is not deterministic";
+  if (!(props & kIDeterministic)) {
+    FSTERROR() << "FST is not deterministic";
+    fst->SetProperties(kError, kError);
+    return;
+  }
 
   if (!(props & kAcceptor)) {  // weighted transducer
     VectorFst< GallicArc<A, STRING_LEFT> > gfst;
-    Map(*fst, &gfst, ToGallicMapper<A, STRING_LEFT>());
+    ArcMap(*fst, &gfst, ToGallicMapper<A, STRING_LEFT>());
     fst->DeleteStates();
     gfst.SetProperties(kAcceptor, kAcceptor);
     Push(&gfst, REWEIGHT_TO_INITIAL, delta);
-    Map(&gfst, QuantizeMapper< GallicArc<A, STRING_LEFT> >(delta));
+    ArcMap(&gfst, QuantizeMapper< GallicArc<A, STRING_LEFT> >(delta));
     EncodeMapper< GallicArc<A, STRING_LEFT> >
       encoder(kEncodeLabels | kEncodeWeights, ENCODE);
     Encode(&gfst, &encoder);
@@ -552,18 +558,18 @@ void Minimize(MutableFst<A>* fst,
         typename A::Weight, STRING_LEFT> > fwfst(gfst);
       SymbolTable *osyms = fst->OutputSymbols() ?
           fst->OutputSymbols()->Copy() : 0;
-      Map(fwfst, fst, FromGallicMapper<A, STRING_LEFT>());
+      ArcMap(fwfst, fst, FromGallicMapper<A, STRING_LEFT>());
       fst->SetOutputSymbols(osyms);
       delete osyms;
     } else {
       sfst->SetOutputSymbols(fst->OutputSymbols());
       GallicToNewSymbolsMapper<A, STRING_LEFT> mapper(sfst);
-      Map(gfst, fst, &mapper);
+      ArcMap(gfst, fst, &mapper);
       fst->SetOutputSymbols(sfst->InputSymbols());
     }
   } else if (props & kWeighted) {  // weighted acceptor
     Push(fst, REWEIGHT_TO_INITIAL, delta);
-    Map(fst, QuantizeMapper<A>(delta));
+    ArcMap(fst, QuantizeMapper<A>(delta));
     EncodeMapper<A> encoder(kEncodeLabels | kEncodeWeights, ENCODE);
     Encode(fst, &encoder);
     AcceptorMinimize(fst);

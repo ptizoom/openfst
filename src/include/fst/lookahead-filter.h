@@ -28,6 +28,7 @@ using std::vector;
 #include <fst/fst.h>
 #include <fst/lookahead-matcher.h>
 
+
 namespace fst {
 
 // Identifies and verifies the capabilities of the matcher to be used for
@@ -43,11 +44,11 @@ MatchType LookAheadMatchType(const M1 &m1, const M2 &m2) {
   else if (type2 == MATCH_INPUT &&
            m2.Flags() & kInputLookAheadMatcher)
     return MATCH_INPUT;
-  else if (m1.Type(true) == MATCH_OUTPUT &&
-           m1.Flags() & kOutputLookAheadMatcher)
+  else if (m1.Flags() & kOutputLookAheadMatcher &&
+           m1.Type(true) == MATCH_OUTPUT)
     return MATCH_OUTPUT;
-  else if (m2.Type(true) == MATCH_INPUT &&
-           m2.Flags() & kInputLookAheadMatcher)
+  else if (m2.Flags() & kInputLookAheadMatcher &&
+           m2.Type(true) == MATCH_INPUT)
     return MATCH_INPUT;
   else
     return MATCH_NONE;
@@ -218,10 +219,11 @@ class LookAheadComposeFilter {
         flags_(lookahead_type_ == MATCH_OUTPUT ?
                filter_.GetMatcher1()->Flags() :
                filter_.GetMatcher2()->Flags()) {
-    if (lookahead_type_ == MATCH_NONE)
-        LOG(FATAL) << "LookAheadComposeFilter: 1st argument cannot "
-                   << "match/look-ahead on output labels and 2nd argument "
-                   << "cannot match/look-ahead on input labels.";
+    if (lookahead_type_ == MATCH_NONE) {
+      FSTERROR() << "LookAheadComposeFilter: 1st argument cannot "
+                 << "match/look-ahead on output labels and 2nd argument "
+                 << "cannot match/look-ahead on input labels.";
+    }
     selector_.GetMatcher()->InitLookAheadFst(selector_.GetFst());
   }
 
@@ -266,8 +268,11 @@ class LookAheadComposeFilter {
     return selector_;
   }
 
-  uint64 Properties(uint64 props) const {
-    return filter_.Properties(props);
+  uint64 Properties(uint64 inprops) const {
+    uint64 outprops = filter_.Properties(inprops);
+    if (lookahead_type_ == MATCH_NONE)
+      outprops |= kError;
+    return outprops;
   }
 
   uint32 LookAheadFlags() const { return flags_; }
@@ -425,8 +430,8 @@ class PushLabelsComposeFilter {
   typedef typename Arc::Label Label;
   typedef typename Arc::Weight Weight;
 
-  typedef MultiEpsMatcher<typename F::Matcher1, vector<Label> > Matcher1;
-  typedef MultiEpsMatcher<typename F::Matcher2, vector<Label> > Matcher2;
+  typedef MultiEpsMatcher<typename F::Matcher1> Matcher1;
+  typedef MultiEpsMatcher<typename F::Matcher2> Matcher2;
   typedef typename F::FilterState FilterState1;
   typedef IntegerFilterState<typename Arc::Label> FilterState2;
   typedef PairFilterState<FilterState1, FilterState2> FilterState;

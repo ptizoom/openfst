@@ -23,8 +23,12 @@
 
 #include <tr1/unordered_map>
 using std::tr1::unordered_map;
+using std::tr1::unordered_multimap;
+#include <map>
+#include <set>
 
 #include <fst/state-table.h>
+#include <fst/fst.h>
 
 namespace fst {
 
@@ -101,6 +105,25 @@ class PdtStack {
       return node.parent_id;
 
     return -1;                               // Non-matching close paren.
+  }
+
+  // Returns the stack ID obtained by "popping" the label at the top
+  // of the current stack ID.
+  StackId Pop(StackId stack_id) const {
+    return nodes_[stack_id].parent_id;
+  }
+
+  // Returns the paren ID at the top of the stack for 'stack_id'
+  ssize_t Top(StackId stack_id) const {
+    return nodes_[stack_id].paren_id;
+  }
+
+  ssize_t ParenId(Label label) const {
+    typename unordered_map<Label, size_t>::const_iterator pit
+        = paren_map_.find(label);
+    if (pit == paren_map_.end())  // Non-paren.
+      return -1;
+    return pit->second;
   }
 
  private:

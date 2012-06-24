@@ -25,14 +25,15 @@ namespace script {
 
 void PrintFstInfo(const FstClass &f, bool test_properties,
                   const string &arc_filter, const string &info_type,
-                  bool pipe) {
-  InfoArgs args(f, test_properties, arc_filter, info_type, pipe);
+                  bool pipe, bool verify) {
+  InfoArgs args(f, test_properties, arc_filter, info_type, pipe, verify);
 
   Apply<Operation<InfoArgs> >("PrintFstInfo", f.ArcType(), &args);
 }
 
 REGISTER_FST_OPERATION(PrintFstInfo, StdArc, InfoArgs);
 REGISTER_FST_OPERATION(PrintFstInfo, LogArc, InfoArgs);
+REGISTER_FST_OPERATION(PrintFstInfo, Log64Arc, InfoArgs);
 
 }  // namespace script
 }  // namespace fst

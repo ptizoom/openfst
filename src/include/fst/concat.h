@@ -24,8 +24,10 @@
 #include <vector>
 using std::vector;
 #include <algorithm>
+
 #include <fst/mutable-fst.h>
 #include <fst/rational.h>
+
 
 namespace fst {
 
@@ -47,14 +49,28 @@ void Concat(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
   typedef typename Arc::Label Label;
   typedef typename Arc::Weight Weight;
 
-  StateId start1 = fst1->Start();
-  if (start1 == kNoStateId)
-    return;
+  // TODO(riley): restore when voice actions issues fixed
+  // Check that the symbol table are compatible
+  if (!CompatSymbols(fst1->InputSymbols(), fst2.InputSymbols()) ||
+      !CompatSymbols(fst1->OutputSymbols(), fst2.OutputSymbols())) {
+    LOG(ERROR) << "Concat: input/output symbol tables of 1st argument "
+               << "do not match input/output symbol tables of 2nd argument";
+    // fst1->SetProperties(kError, kError);
+    // return;
+  }
 
   uint64 props1 = fst1->Properties(kFstProperties, false);
   uint64 props2 = fst2.Properties(kFstProperties, false);
 
+  StateId start1 = fst1->Start();
+  if (start1 == kNoStateId) {
+    if (props2 & kError) fst1->SetProperties(kError, kError);
+    return;
+  }
+
   StateId numstates1 = fst1->NumStates();
+  if (fst2.Properties(kExpanded, false))
+    fst1->ReserveStates(numstates1 + CountStates(fst2));
 
   for (StateIterator< Fst<Arc> > siter2(fst2);
        !siter2.Done();
@@ -62,6 +78,7 @@ void Concat(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
     StateId s1 = fst1->AddState();
     StateId s2 = siter2.Value();
     fst1->SetFinal(s1, fst2.Final(s2));
+    fst1->ReserveArcs(s1, fst2.NumArcs(s2));
     for (ArcIterator< Fst<Arc> > aiter(fst2, s2);
          !aiter.Done();
          aiter.Next()) {
@@ -98,14 +115,27 @@ void Concat(const Fst<Arc> &fst1, MutableFst<Arc> *fst2) {
   typedef typename Arc::Label Label;
   typedef typename Arc::Weight Weight;
 
-  StateId start2 = fst2->Start();
-  if (start2 == kNoStateId)
-    return;
+  // Check that the symbol table are compatible
+  if (!CompatSymbols(fst1.InputSymbols(), fst2->InputSymbols()) ||
+      !CompatSymbols(fst1.OutputSymbols(), fst2->OutputSymbols())) {
+    LOG(ERROR) << "Concat: input/output symbol tables of 1st argument "
+               << "do not match input/output symbol tables of 2nd argument";
+    // fst2->SetProperties(kError, kError);
+    // return;
+  }
 
   uint64 props1 = fst1.Properties(kFstProperties, false);
   uint64 props2 = fst2->Properties(kFstProperties, false);
 
+  StateId start2 = fst2->Start();
+  if (start2 == kNoStateId) {
+    if (props1 & kError) fst2->SetProperties(kError, kError);
+    return;
+  }
+
   StateId numstates2 = fst2->NumStates();
+  if (fst1.Properties(kExpanded, false))
+    fst2->ReserveStates(numstates2 + CountStates(fst1));
 
   for (StateIterator< Fst<Arc> > siter(fst1);
        !siter.Done();
@@ -113,6 +143,7 @@ void Concat(const Fst<Arc> &fst1, MutableFst<Arc> *fst2) {
     StateId s1 = siter.Value();
     StateId s2 = fst2->AddState();
     Weight final = fst1.Final(s1);
+    fst2->ReserveArcs(s2, fst1.NumArcs(s1) + (final != Weight::Zero() ? 1 : 0));
     if (final != Weight::Zero())
       fst2->AddArc(s2, Arc(0, 0, final, start2));
     for (ArcIterator< Fst<Arc> > aiter(fst1, s1);
