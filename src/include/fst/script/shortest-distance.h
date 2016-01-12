@@ -175,11 +175,11 @@ void ShortestDistance(ShortestDistanceArgs1 *args) {
       return;
 
     case FIFO_QUEUE:
-       ShortestDistanceHelper<Arc, FifoQueue<StateId> >(args);
+      ShortestDistanceHelper<Arc, FifoQueue<StateId> >(args);
       return;
 
     case LIFO_QUEUE:
-       ShortestDistanceHelper<Arc, LifoQueue<StateId> >(args);
+      ShortestDistanceHelper<Arc, LifoQueue<StateId> >(args);
       return;
 
     case SHORTEST_FIRST_QUEUE:
@@ -188,11 +188,11 @@ void ShortestDistance(ShortestDistanceArgs1 *args) {
       return;
 
     case STATE_ORDER_QUEUE:
-       ShortestDistanceHelper<Arc, StateOrderQueue<StateId> >(args);
+      ShortestDistanceHelper<Arc, StateOrderQueue<StateId> >(args);
       return;
 
     case TOP_ORDER_QUEUE:
-       ShortestDistanceHelper<Arc, TopOrderQueue<StateId> >(args);
+      ShortestDistanceHelper<Arc, TopOrderQueue<StateId> >(args);
       return;
   }
 }
@@ -236,11 +236,6 @@ void ShortestDistance(const FstClass &fst, vector<WeightClass> *distance,
 // 2
 void ShortestDistance(const FstClass &ifst, vector<WeightClass> *distance,
                       bool reverse = false, double delta = fst::kDelta);
-
-#ifndef SWIG
-// 3
-WeightClass ShortestDistance(const FstClass &ifst);
-#endif
 
 }  // namespace script
 }  // namespace fst

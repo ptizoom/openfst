@@ -23,9 +23,9 @@
 #define FST_LIB_STATE_MAP_H__
 
 #include <algorithm>
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <string>
 #include <utility>
 using std::pair; using std::make_pair;
@@ -191,8 +191,6 @@ class StateMapFstImpl : public CacheImpl<B> {
   using FstImpl<B>::SetInputSymbols;
   using FstImpl<B>::SetOutputSymbols;
 
-  using VectorFstBaseImpl<typename CacheImpl<B>::State>::NumStates;
-
   using CacheImpl<B>::PushArc;
   using CacheImpl<B>::HasArcs;
   using CacheImpl<B>::HasFinal;
@@ -335,7 +333,8 @@ class StateMapFst : public ImplToFst< StateMapFstImpl<A, B, C> > {
   typedef B Arc;
   typedef typename B::Weight Weight;
   typedef typename B::StateId StateId;
-  typedef CacheState<B> State;
+  typedef DefaultCacheStore<B> Store;
+  typedef typename Store::State State;
   typedef StateMapFstImpl<A, B, C> Impl;
 
   StateMapFst(const Fst<A> &fst, const C &mapper,
@@ -468,7 +467,7 @@ class ArcSumMapper {
     // First sorts the exiting arcs by input label, output label
     // and destination state and then sums weights of arcs with
     // the same input label, output label, and destination state.
-    sort(arcs_.begin(), arcs_.end(), comp_);
+    std::sort(arcs_.begin(), arcs_.end(), comp_);
     size_t narcs = 0;
     for (size_t i = 0; i < arcs_.size(); ++i) {
       if (narcs > 0 && equal_(arcs_[i], arcs_[narcs - 1])) {
@@ -495,7 +494,7 @@ class ArcSumMapper {
 
  private:
   struct Compare {
-    bool operator()(const A& x, const A& y) {
+    bool operator()(const A &x, const A &y) const {
       if (x.ilabel < y.ilabel) return true;
       if (x.ilabel > y.ilabel) return false;
       if (x.olabel < y.olabel) return true;
@@ -551,9 +550,9 @@ class ArcUniqueMapper {
 
     // First sorts the exiting arcs by input label, output label
     // and destination state and then uniques identical arcs
-    sort(arcs_.begin(), arcs_.end(), comp_);
+    std::sort(arcs_.begin(), arcs_.end(), comp_);
     typename vector<A>::iterator unique_end =
-        unique(arcs_.begin(), arcs_.end(), equal_);
+        std::unique(arcs_.begin(), arcs_.end(), equal_);
     arcs_.resize(unique_end - arcs_.begin());
   }
 
@@ -570,7 +569,7 @@ class ArcUniqueMapper {
 
  private:
   struct Compare {
-    bool operator()(const A& x, const A& y) {
+    bool operator()(const A &x, const A &y) const {
       if (x.ilabel < y.ilabel) return true;
       if (x.ilabel > y.ilabel) return false;
       if (x.olabel < y.olabel) return true;
@@ -582,7 +581,7 @@ class ArcUniqueMapper {
   };
 
   struct Equal {
-    bool operator()(const A& x, const A& y) {
+    bool operator()(const A &x, const A &y) const {
       return (x.ilabel == y.ilabel &&
               x.olabel == y.olabel &&
               x.nextstate == y.nextstate &&

@@ -34,7 +34,7 @@ using std::vector;
 
 namespace fst {
 
-template <class A> class MutableArcIteratorData;
+template <class A> struct MutableArcIteratorData;
 
 // An expanded FST plus mutators (use MutableArcIterator to modify arcs).
 template <class A>
@@ -96,7 +96,7 @@ class MutableFst : public ExpandedFst<A> {
       ropts.header = &hdr;
     }
     if (!(hdr.Properties() & kMutable)) {
-      LOG(ERROR) << "MutableFst::Read: Not an MutableFst: " << ropts.source;
+      LOG(ERROR) << "MutableFst::Read: Not a MutableFst: " << ropts.source;
       return 0;
     }
     FstRegister<A> *registr = FstRegister<A>::GetRegister();
@@ -121,14 +121,15 @@ class MutableFst : public ExpandedFst<A> {
                              const string &convert_type = "vector") {
     if (convert == false) {
       if (!filename.empty()) {
-        ifstream strm(filename.c_str(), ifstream::in | ifstream::binary);
+        ifstream strm(filename.c_str(),
+                      std::ios_base::in | std::ios_base::binary);
         if (!strm) {
           LOG(ERROR) << "MutableFst::Read: Can't open file: " << filename;
           return 0;
         }
         return Read(strm, FstReadOptions(filename));
       } else {
-        return Read(cin, FstReadOptions("standard input"));
+        return Read(std::cin, FstReadOptions("standard input"));
       }
     } else {  // Converts to 'convert_type' if not mutable.
       Fst<A> *ifst = Fst<A>::Read(filename);
@@ -174,7 +175,7 @@ struct MutableArcIteratorData {
 // Generic mutable arc iterator, templated on the FST definition
 // - a wrapper around pointer to specific one.
 // Here is a typical use: \code
-//   for (MutableArcIterator<StdFst> aiter(&fst, s));
+//   for (MutableArcIterator<StdFst> aiter(&fst, s);
 //        !aiter.Done();
 //         aiter.Next()) {
 //     StdArc arc = aiter.Value();

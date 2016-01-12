@@ -21,6 +21,7 @@
 #ifndef FST_SCRIPT_INFO_IMPL_H_
 #define FST_SCRIPT_INFO_IMPL_H_
 
+#include <map>
 #include <string>
 #include <vector>
 using std::vector;
@@ -60,6 +61,7 @@ template <class A> class FstInfo {
                         fst.OutputSymbols()->Name() : "none"),
         nstates_(0), narcs_(0), start_(kNoStateId), nfinal_(0),
         nepsilons_(0), niepsilons_(0), noepsilons_(0),
+        ilabel_mult_(0.0), olabel_mult_(0.0),
         naccess_(0), ncoaccess_(0), nconnect_(0), ncc_(0), nscc_(0),
         input_match_type_(MATCH_NONE), output_match_type_(MATCH_NONE),
         input_lookahead_(false), output_lookahead_(false),
@@ -94,6 +96,8 @@ template <class A> class FstInfo {
       StateId s = siter.Value();
       if (fst.Final(s) != Weight::Zero())
         ++nfinal_;
+      map<Label, int64> ilabel_count;
+      map<Label, int64> olabel_count;
       for (ArcIterator< Fst<A> > aiter(fst, s);
            !aiter.Done();
            aiter.Next()) {
@@ -105,7 +109,24 @@ template <class A> class FstInfo {
           ++niepsilons_;
         if (arc.olabel == 0)
           ++noepsilons_;
+        ++ilabel_count[arc.ilabel];
+        ++olabel_count[arc.olabel];
       }
+      for (typename map<Label, int64>::iterator it = ilabel_count.begin();
+           it != ilabel_count.end();
+           ++it) {
+        ilabel_mult_ += it->second * it->second;
+      }
+      for (typename map<Label, int64>::iterator it = olabel_count.begin();
+           it != olabel_count.end();
+           ++it) {
+        olabel_mult_ += it->second * it->second;
+      }
+    }
+
+    if (narcs_ > 0) {
+      ilabel_mult_ /= narcs_;
+      olabel_mult_ /= narcs_;
     }
 
     {
@@ -175,7 +196,7 @@ template <class A> class FstInfo {
   const string& ArcType() const { return A::Type(); }
   const string& InputSymbols() const { return input_symbols_; }
   const string& OutputSymbols() const { return output_symbols_; }
-  const bool LongInfo() const { return long_info_; }
+  bool LongInfo() const { return long_info_; }
   const string& ArcFilterType() const { return arc_filter_type_; }
 
   // Long info
@@ -190,6 +211,9 @@ template <class A> class FstInfo {
   int64 NumEpsilons() const { CheckLong();  return nepsilons_; }
   int64 NumInputEpsilons() const { CheckLong(); return niepsilons_; }
   int64 NumOutputEpsilons() const { CheckLong(); return noepsilons_; }
+  double InputLabelMultiplicity() const { CheckLong(); return ilabel_mult_; }
+  double OutputLabelMultiplicity() const { CheckLong(); return olabel_mult_; }
+
   int64 NumAccessible() const { CheckLong(); return naccess_; }
   int64 NumCoAccessible() const { CheckLong(); return ncoaccess_; }
   int64 NumConnected() const { CheckLong(); return nconnect_; }
@@ -213,6 +237,8 @@ template <class A> class FstInfo {
   int64 nepsilons_;
   int64 niepsilons_;
   int64 noepsilons_;
+  double ilabel_mult_;
+  double olabel_mult_;
   int64 naccess_;
   int64 ncoaccess_;
   int64 nconnect_;
@@ -230,17 +256,17 @@ template <class A> class FstInfo {
 
 template <class A>
 void PrintFstInfo(const FstInfo<A> &fstinfo, bool pipe = false) {
-  ostream &os = pipe ? cerr : cout;
+  ostream& os = pipe ? std::cerr : std::cout;
 
   ios_base::fmtflags old = os.setf(ios::left);
   os.width(50);
-  os << "fst type" <<  fstinfo.FstType() << endl;
+  os << "fst type" << fstinfo.FstType() << std::endl;
   os.width(50);
-  os << "arc type" << fstinfo.ArcType() << endl;
+  os << "arc type" << fstinfo.ArcType() << std::endl;
   os.width(50);
-  os << "input symbol table" << fstinfo.InputSymbols() << endl;
+  os << "input symbol table" << fstinfo.InputSymbols() << std::endl;
   os.width(50);
-  os << "output symbol table" << fstinfo.OutputSymbols() << endl;
+  os << "output symbol table" << fstinfo.OutputSymbols() << std::endl;
 
   if (!fstinfo.LongInfo()) {
     os.setf(old);
@@ -248,19 +274,25 @@ void PrintFstInfo(const FstInfo<A> &fstinfo, bool pipe = false) {
   }
 
   os.width(50);
-  os << "# of states" << fstinfo.NumStates() << endl;
+  os << "# of states" << fstinfo.NumStates() << std::endl;
   os.width(50);
-  os << "# of arcs" << fstinfo.NumArcs() << endl;
+  os << "# of arcs" << fstinfo.NumArcs() << std::endl;
   os.width(50);
-  os << "initial state" << fstinfo.Start() << endl;
+  os << "initial state" << fstinfo.Start() << std::endl;
   os.width(50);
-  os << "# of final states" << fstinfo.NumFinal() << endl;
+  os << "# of final states" << fstinfo.NumFinal() << std::endl;
   os.width(50);
-  os << "# of input/output epsilons" << fstinfo.NumEpsilons() << endl;
+  os << "# of input/output epsilons" << fstinfo.NumEpsilons() << std::endl;
   os.width(50);
-  os << "# of input epsilons" << fstinfo.NumInputEpsilons() << endl;
+  os << "# of input epsilons" << fstinfo.NumInputEpsilons() << std::endl;
   os.width(50);
-  os << "# of output epsilons" << fstinfo.NumOutputEpsilons() << endl;
+  os << "# of output epsilons" << fstinfo.NumOutputEpsilons() << std::endl;
+  os.width(50);
+  os << "input label multiplicity" << fstinfo.InputLabelMultiplicity()
+     << std::endl;
+  os.width(50);
+  os << "output label multiplicity" << fstinfo.OutputLabelMultiplicity()
+     << std::endl;
   os.width(50);
 
   string arc_type = "";
@@ -273,34 +305,37 @@ void PrintFstInfo(const FstInfo<A> &fstinfo, bool pipe = false) {
 
   string accessible_label = "# of " +  arc_type + "accessible states";
   os.width(50);
-  os << accessible_label << fstinfo.NumAccessible() << endl;
+  os << accessible_label << fstinfo.NumAccessible() << std::endl;
   string coaccessible_label = "# of " +  arc_type + "coaccessible states";
   os.width(50);
-  os << coaccessible_label << fstinfo.NumCoAccessible() << endl;
+  os << coaccessible_label << fstinfo.NumCoAccessible() << std::endl;
   string connected_label = "# of " +  arc_type + "connected states";
   os.width(50);
-  os << connected_label << fstinfo.NumConnected() << endl;
+  os << connected_label << fstinfo.NumConnected() << std::endl;
   string numcc_label = "# of " +  arc_type + "connected components";
   os.width(50);
-  os << numcc_label << fstinfo.NumCc() << endl;
+  os << numcc_label << fstinfo.NumCc() << std::endl;
   string numscc_label = "# of " +  arc_type + "strongly conn components";
   os.width(50);
-  os << numscc_label << fstinfo.NumScc() << endl;
+  os << numscc_label << fstinfo.NumScc() << std::endl;
 
   os.width(50);
   os << "input matcher"
-     << (fstinfo.InputMatchType() == MATCH_INPUT ? 'y' :
-         fstinfo.InputMatchType() == MATCH_NONE ? 'n' : '?') << endl;
+     << (fstinfo.InputMatchType() == MATCH_INPUT
+             ? 'y'
+             : fstinfo.InputMatchType() == MATCH_NONE ? 'n' : '?') << std::endl;
   os.width(50);
   os << "output matcher"
-     << (fstinfo.OutputMatchType() == MATCH_OUTPUT ? 'y' :
-         fstinfo.OutputMatchType() == MATCH_NONE ? 'n' : '?') << endl;
+     << (fstinfo.OutputMatchType() == MATCH_OUTPUT
+             ? 'y'
+             : fstinfo.OutputMatchType() == MATCH_NONE ? 'n' : '?')
+     << std::endl;
   os.width(50);
-  os << "input lookahead"
-     << (fstinfo.InputLookAhead() ? 'y' : 'n') << endl;
+  os << "input lookahead" << (fstinfo.InputLookAhead() ? 'y' : 'n')
+     << std::endl;
   os.width(50);
-  os << "output lookahead"
-     << (fstinfo.OutputLookAhead() ? 'y' : 'n') << endl;
+  os << "output lookahead" << (fstinfo.OutputLookAhead() ? 'y' : 'n')
+     << std::endl;
 
   uint64 prop = 1;
   for (int i = 0; i < 64; ++i, prop <<= 1) {
@@ -308,13 +343,13 @@ void PrintFstInfo(const FstInfo<A> &fstinfo, bool pipe = false) {
       char value = 'n';
       if (fstinfo.Properties() & prop) value = 'y';
       os.width(50);
-      os << PropertyNames[i] << value << endl;
+      os << PropertyNames[i] << value << std::endl;
     } else if (prop & kPosTrinaryProperties) {
       char value = '?';
       if (fstinfo.Properties() & prop) value = 'y';
       else if (fstinfo.Properties() & prop << 1) value = 'n';
       os.width(50);
-      os << PropertyNames[i] << value << endl;
+      os << PropertyNames[i] << value << std::endl;
     }
   }
   os.setf(old);

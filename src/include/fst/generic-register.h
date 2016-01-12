@@ -17,10 +17,13 @@
 #ifndef FST_LIB_GENERIC_REGISTER_H_
 #define FST_LIB_GENERIC_REGISTER_H_
 
+#ifndef FST_NO_DYNAMIC_LINKING
+#include <dlfcn.h>
+#include <fst/compat.h>
+#endif
 #include <map>
 #include <string>
 
-#include <fst/compat.h>
 #include <fst/types.h>
 
 // Generic class representing a globally-stored correspondence between
@@ -54,7 +57,7 @@ class GenericRegister {
                 const EntryType &entry) {
     MutexLock l(register_lock_);
 
-    register_table_.insert(make_pair(key, entry));
+    register_table_.insert(std::make_pair(key, entry));
   }
 
   EntryType GetEntry(const KeyType &key) const {
@@ -72,6 +75,9 @@ class GenericRegister {
   // Override this if you want to be able to load missing definitions from
   // shared object files.
   virtual EntryType LoadEntryFromSharedObject(const KeyType &key) const {
+#ifdef FST_NO_DYNAMIC_LINKING
+    return EntryType();
+#else
     string so_filename = ConvertKeyToSoFilename(key);
 
     void *handle = dlopen(so_filename.c_str(), RTLD_LAZY);
@@ -90,6 +96,7 @@ class GenericRegister {
       return EntryType();
     }
     return *entry;
+#endif  // FST_NO_DYNAMIC_LINKING
   }
 
   // Override this to define how to turn a key into an SO filename.

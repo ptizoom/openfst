@@ -87,10 +87,9 @@ class StringArc {
 
   static const string &Type() {  // Arc type name
     static const string type =
-        S == STRING_LEFT ? "standard_string" :
+        S == STRING_LEFT ? "left_standard_string" :
         (S == STRING_RIGHT ? "right_standard_string" :
-         (S == STRING_LEFT_RESTRICT ? "restricted_string" :
-          "right_restricted_string"));
+         "restricted_standard_string");
     return type;
   }
 
@@ -103,12 +102,12 @@ class StringArc {
 
 // Arc with label and state Id type the same as template arg and with
 // weights over the Gallic semiring w.r.t the output labels and weights of A.
-template <class A, StringType S = STRING_LEFT>
+template <class A, GallicType G = GALLIC_LEFT>
 struct GallicArc {
   typedef A Arc;
   typedef typename A::Label Label;
   typedef typename A::StateId StateId;
-  typedef GallicWeight<Label, typename A::Weight, S> Weight;
+  typedef GallicWeight<Label, typename A::Weight, G> Weight;
 
   GallicArc() {}
 
@@ -121,10 +120,11 @@ struct GallicArc {
 
   static const string &Type() {  // Arc type name
     static const string type =
-        (S == STRING_LEFT ? "gallic_" :
-         (S == STRING_RIGHT ? "right_gallic_" :
-          (S == STRING_LEFT_RESTRICT ? "restricted_gallic_" :
-           "right_restricted_gallic_"))) + A::Type();
+        (G == GALLIC_LEFT ? "left_gallic_" :
+         (G == GALLIC_RIGHT ? "right_gallic_" :
+          (G == GALLIC_RESTRICT ? "restricted_gallic_" :
+           (G == GALLIC_MIN ? "min_gallic_" :
+            "gallic_")))) + A::Type();
     return type;
   }
 

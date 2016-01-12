@@ -23,9 +23,9 @@
 #ifndef FST_LIB_ARC_MAP_H__
 #define FST_LIB_ARC_MAP_H__
 
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <string>
 #include <utility>
 using std::pair; using std::make_pair;
@@ -165,8 +165,8 @@ void ArcMap(MutableFst<A> *fst, C* mapper) {
           } else {
             fst->SetFinal(s, final_arc.weight);
           }
-          break;
         }
+        break;
       }
       case MAP_REQUIRE_SUPERFINAL: {
         if (s != superfinal) {
@@ -314,8 +314,6 @@ class ArcMapFstImpl : public CacheImpl<B> {
   using FstImpl<B>::SetProperties;
   using FstImpl<B>::SetInputSymbols;
   using FstImpl<B>::SetOutputSymbols;
-
-  using VectorFstBaseImpl<typename CacheImpl<B>::State>::NumStates;
 
   using CacheImpl<B>::PushArc;
   using CacheImpl<B>::HasArcs;
@@ -558,7 +556,8 @@ class ArcMapFst : public ImplToFst< ArcMapFstImpl<A, B, C> > {
   typedef B Arc;
   typedef typename B::Weight Weight;
   typedef typename B::StateId StateId;
-  typedef CacheState<B> State;
+  typedef DefaultCacheStore<B> Store;
+  typedef typename Store::State State;
   typedef ArcMapFstImpl<A, B, C> Impl;
 
   ArcMapFst(const Fst<A> &fst, const C &mapper, const ArcMapFstOptions& opts)
@@ -764,14 +763,14 @@ typedef WeightConvertMapper<Log64Arc, StdArc> Log64ToStdMapper;
 typedef WeightConvertMapper<Log64Arc, LogArc> Log64ToLogMapper;
 
 // Mapper from A to GallicArc<A>.
-template <class A, StringType S = STRING_LEFT>
+template <class A, GallicType G = GALLIC_LEFT>
 struct ToGallicMapper {
   typedef A FromArc;
-  typedef GallicArc<A, S> ToArc;
+  typedef GallicArc<A, G> ToArc;
 
-  typedef StringWeight<typename A::Label, S> SW;
+  typedef StringWeight<typename A::Label, GALLIC_STRING_TYPE(G)> SW;
   typedef typename A::Weight AW;
-  typedef typename GallicArc<A, S>::Weight GW;
+  typedef typename GallicArc<A, G>::Weight GW;
 
   ToArc operator()(const A &arc) const {
     // 'Super-final' arc.
@@ -779,7 +778,7 @@ struct ToGallicMapper {
       return ToArc(0, 0, GW(SW::One(), arc.weight), kNoStateId);
     // 'Super-non-final' arc.
     else if (arc.nextstate == kNoStateId)
-      return ToArc(0, 0, GW(SW::Zero(), arc.weight), kNoStateId);
+      return ToArc(0, 0, GW::Zero(), kNoStateId);
     // Epsilon label.
     else if (arc.olabel == 0)
       return ToArc(arc.ilabel, arc.ilabel,
@@ -803,15 +802,14 @@ struct ToGallicMapper {
 
 
 // Mapper from GallicArc<A> to A.
-template <class A, StringType S = STRING_LEFT>
+template <class A, GallicType G = GALLIC_LEFT>
 struct FromGallicMapper {
-  typedef GallicArc<A, S> FromArc;
+  typedef GallicArc<A, G> FromArc;
   typedef A ToArc;
 
   typedef typename A::Label Label;
-  typedef StringWeight<Label, S> SW;
   typedef typename A::Weight AW;
-  typedef typename GallicArc<A, S>::Weight GW;
+  typedef typename GallicArc<A, G>::Weight GW;
 
   FromGallicMapper(Label superfinal_label = 0)
       : superfinal_label_(superfinal_label), error_(false) {}
@@ -821,22 +819,20 @@ struct FromGallicMapper {
     if (arc.nextstate == kNoStateId && arc.weight == GW::Zero())
       return A(arc.ilabel, 0, AW::Zero(), kNoStateId);
 
-    SW w1 = arc.weight.Value1();
-    AW w2 = arc.weight.Value2();
-    StringWeightIterator<Label, S> iter1(w1);
-
-    Label l = w1.Size() == 1 ? iter1.Value() : 0;
-
-    if (l == kStringInfinity || l == kStringBad ||
-        arc.ilabel != arc.olabel || w1.Size() > 1) {
-      FSTERROR() << "FromGallicMapper: unrepesentable weight";
+    Label l = kNoLabel;
+    AW w;
+    if (!Extract(arc.weight, &w, &l) || arc.ilabel != arc.olabel) {
+      FSTERROR() << "FromGallicMapper: unrepresentable weight: " << arc.weight
+                 << " for arc with ilabel = " << arc.ilabel
+                 << ", olabel = " << arc.olabel
+                 << ", nextstate = " << arc.nextstate;
       error_ = true;
     }
 
     if (arc.ilabel == 0 && l != 0 && arc.nextstate == kNoStateId)
-      return A(superfinal_label_, l, w2, arc.nextstate);
+      return A(superfinal_label_, l, w, arc.nextstate);
     else
-      return A(arc.ilabel, l, w2, arc.nextstate);
+      return A(arc.ilabel, l, w, arc.nextstate);
   }
 
   MapFinalAction FinalAction() const { return MAP_ALLOW_SUPERFINAL; }
@@ -854,22 +850,51 @@ struct FromGallicMapper {
   }
 
  private:
+  template <GallicType GT>
+  static bool Extract(
+      const GallicWeight<Label, AW, GT> &gallic_weight,
+      typename A::Weight *weight, typename A::Label *label) {
+    StringWeight<Label, GALLIC_STRING_TYPE(GT)> w1 = gallic_weight.Value1();
+    AW w2 = gallic_weight.Value2();
+    StringWeightIterator<Label, GALLIC_STRING_TYPE(GT)> iter1(w1);
+
+    Label l = w1.Size() == 1 ? iter1.Value() : 0;
+    if (l == kStringInfinity || l == kStringBad || w1.Size() > 1)
+      return false;
+
+    *label = l;
+    *weight = w2;
+    return true;
+  }
+
+  static bool Extract(
+      const GallicWeight<Label, AW, GALLIC> &gallic_weight,
+      typename A::Weight *weight, typename A::Label *label) {
+    if (gallic_weight.Size() > 1) return false;
+    if (gallic_weight.Size() == 0) {
+      *label = 0;
+      *weight = A::Weight::Zero();
+      return true;
+    }
+    return Extract<GALLIC_RESTRICT>(gallic_weight.Back(), weight, label);
+  }
+
+ private:
   Label superfinal_label_;
   mutable bool error_;
 };
 
-
 // Mapper from GallicArc<A> to A.
-template <class A, StringType S = STRING_LEFT>
+template <class A, GallicType G = GALLIC_LEFT>
 struct GallicToNewSymbolsMapper {
-  typedef GallicArc<A, S> FromArc;
+  typedef GallicArc<A, G> FromArc;
   typedef A ToArc;
 
   typedef typename A::StateId StateId;
   typedef typename A::Label Label;
-  typedef StringWeight<Label, S> SW;
+  typedef StringWeight<Label, GALLIC_STRING_TYPE(G)> SW;
   typedef typename A::Weight AW;
-  typedef typename GallicArc<A, S>::Weight GW;
+  typedef typename GallicArc<A, G>::Weight GW;
 
   GallicToNewSymbolsMapper(MutableFst<ToArc> *fst)
       : fst_(fst), lmax_(0), osymbols_(fst->OutputSymbols()),
@@ -906,7 +931,7 @@ struct GallicToNewSymbolsMapper {
       } else {
         l = ++lmax_;
         map_.insert(pair<const SW, Label>(w1, l));
-        StringWeightIterator<Label, S> iter1(w1);
+        StringWeightIterator<Label, GALLIC_STRING_TYPE(G)> iter1(w1);
         StateId n;
         string s;
         for(size_t i = 0, p = state_;
@@ -925,7 +950,7 @@ struct GallicToNewSymbolsMapper {
     }
 
     if (l == kStringInfinity || l == kStringBad || arc.ilabel != arc.olabel) {
-      FSTERROR() << "GallicToNewSymbolMapper: unrepesentable weight";
+      FSTERROR() << "GallicToNewSymbolMapper: unrepresentable weight: " << l;
       error_ = true;
     }
 

@@ -25,6 +25,7 @@
 #include <vector>
 using std::vector;
 
+#include <fst/filter-state.h>
 #include <fst/fst.h>
 #include <fst/lookahead-matcher.h>
 
@@ -375,8 +376,11 @@ class PushWeightsComposeFilter {
     const FilterState2 &f2 = f_.GetState2();
     const Weight &fweight = f2.GetWeight();
 
+    if (lweight == Weight::Zero())  // disallows Zero() weight futures
+      return FilterState::NoState();
+
     arc2->weight = Divide(Times(arc2->weight, lweight), fweight);
-    return FilterState(f1, FilterState2(lweight));
+    return FilterState(f1, FilterState2(lweight.Quantize()));
   }
 
   void FilterFinal(Weight *weight1, Weight *weight2) const {

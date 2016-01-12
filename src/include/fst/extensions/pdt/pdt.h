@@ -21,9 +21,9 @@
 #ifndef FST_EXTENSIONS_PDT_PDT_H__
 #define FST_EXTENSIONS_PDT_PDT_H__
 
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <map>
 #include <set>
 
@@ -93,7 +93,7 @@ class PdtStack {
     ssize_t paren_id = pit->second;
 
     if (label == parens_[paren_id].first) {  // Open paren.
-      StackId &child_id = child_map_[make_pair(stack_id, label)];
+      StackId &child_id = child_map_[std::make_pair(stack_id, label)];
       if (child_id == 0) {                   // Child not found, push label.
         child_id = nodes_.size();
         nodes_.push_back(StackNode(stack_id, paren_id));

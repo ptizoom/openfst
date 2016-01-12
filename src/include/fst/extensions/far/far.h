@@ -59,7 +59,7 @@ class FarHeader {
       return true;
     } else if (IsSTList(filename)) {  // Check if STList
       ReadSTListHeader(filename, &fsthdr);
-      fartype_ = "sttable";
+      fartype_ = "stlist";
       arctype_ = fsthdr.ArcType().empty() ? "unknown" : fsthdr.ArcType();
       return true;
     } else if (IsFst(filename)) {  // Check if Fst
@@ -125,7 +125,7 @@ class FarReader {
   // Sets current position to the beginning of the achive.
   static FarReader *Open(const vector<string> &filenames);
 
-  // Resets current posision to beginning of archive.
+  // Resets current position to beginning of archive.
   virtual void Reset() = 0;
 
   // Sets current position to first entry >= key.  Returns true if a match.
@@ -273,13 +273,10 @@ FarWriter<A> *FarWriter<A>::Create(const string &filename, FarType type) {
         return STListFarWriter<A>::Create(filename);
     case FAR_STTABLE:
       return STTableFarWriter<A>::Create(filename);
-      break;
     case FAR_STLIST:
       return STListFarWriter<A>::Create(filename);
-      break;
     case FAR_FST:
       return FstFarWriter<A>::Create(filename);
-      break;
     default:
       LOG(ERROR) << "FarWriter::Create: unknown far type";
       return 0;
@@ -408,12 +405,12 @@ class FstFarReader : public FarReader<A> {
 
   FstFarReader(const vector<string> &filenames)
       : keys_(filenames), has_stdin_(false), pos_(0), fst_(0), error_(false) {
-    sort(keys_.begin(), keys_.end());
+    std::sort(keys_.begin(), keys_.end());
     streams_.resize(keys_.size(), 0);
     for (size_t i = 0; i < keys_.size(); ++i) {
       if (keys_[i].empty()) {
         if (!has_stdin_) {
-          streams_[i] = &cin;
+          streams_[i] = &std::cin;
           //sources_[i] = "stdin";
           has_stdin_ = true;
         } else {
@@ -424,7 +421,7 @@ class FstFarReader : public FarReader<A> {
         }
       } else {
         streams_[i] = new ifstream(
-            keys_[i].c_str(), ifstream::in | ifstream::binary);
+            keys_[i].c_str(), std::ios_base::in | std::ios_base::binary);
       }
     }
     if (pos_ >= keys_.size()) return;
@@ -479,7 +476,10 @@ class FstFarReader : public FarReader<A> {
 
  private:
   void ReadFst() {
-    if (fst_) delete fst_;
+    if (fst_) {
+      delete fst_;
+      fst_ = 0;
+    }
     if (pos_ >= keys_.size()) return;
     streams_[pos_]->seekg(0);
     fst_ = Fst<A>::Read(*streams_[pos_], FstReadOptions());

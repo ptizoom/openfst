@@ -5,10 +5,10 @@ if HAVE_BIN
 bin_PROGRAMS = fstarcsort fstclosure fstcompile fstcompose fstconcat \
 fstconnect fstconvert fstdeterminize fstdifference fstdraw \
 fstencode fstepsnormalize fstequal fstequivalent fstinfo fstintersect \
-fstinvert fstmap fstminimize fstprint fstproject fstprune fstpush fstrandgen \
-fstrelabel fstreplace fstreverse fstreweight fstrmepsilon \
+fstinvert fstisomorphic fstmap fstminimize fstprint fstproject fstprune \
+fstpush fstrandgen fstrelabel fstreplace fstreverse fstreweight fstrmepsilon \
 fstshortestdistance fstshortestpath fstsymbols fstsynchronize fsttopsort \
-fstunion
+fstunion fstdisambiguate
 
 fstarcsort_SOURCES = fstarcsort.cc
 
@@ -28,7 +28,7 @@ fstdeterminize_SOURCES = fstdeterminize.cc
 
 fstdifference_SOURCES = fstdifference.cc
 
-# fstdisambiguate_SOURCES = fstdisambiguate.cc
+fstdisambiguate_SOURCES = fstdisambiguate.cc
 
 fstdraw_SOURCES = fstdraw.cc
 
@@ -45,6 +45,8 @@ fstinfo_SOURCES = fstinfo.cc
 fstintersect_SOURCES = fstintersect.cc
 
 fstinvert_SOURCES = fstinvert.cc
+
+fstisomorphic_SOURCES = fstisomorphic.cc
 
 fstmap_SOURCES = fstmap.cc
 

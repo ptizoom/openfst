@@ -24,11 +24,12 @@
 
 #include <algorithm>
 #include <climits>
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <forward_list>
+using std::forward_list;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <map>
-#include <fst/slist.h>
 #include <string>
 #include <vector>
 using std::vector;
@@ -37,6 +38,7 @@ using std::vector;
 #include <fst/cache.h>
 #include <fst/bi-table.h>
 #include <fst/factor-weight.h>
+#include <fst/filter-state.h>
 #include <fst/prune.h>
 #include <fst/test-properties.h>
 
@@ -94,10 +96,10 @@ class LabelCommonDivisor {
 // The gallic common divisor uses the label common divisor on the
 // string component and the template argument D common divisor on the
 // weight component, which defaults to the default common divisor.
-template <class L, class W, StringType S, class D = DefaultCommonDivisor<W> >
+template <class L, class W, GallicType G, class D = DefaultCommonDivisor<W> >
 class GallicCommonDivisor {
  public:
-  typedef GallicWeight<L, W, S> Weight;
+  typedef GallicWeight<L, W, G> Weight;
 
   Weight operator()(const Weight &w1, const Weight &w2) const {
     return Weight(label_common_divisor_(w1.Value1(), w2.Value1()),
@@ -105,10 +107,30 @@ class GallicCommonDivisor {
   }
 
  private:
-  LabelCommonDivisor<L, S> label_common_divisor_;
+  LabelCommonDivisor<L, GALLIC_STRING_TYPE(G)> label_common_divisor_;
   D weight_common_divisor_;
 };
 
+// Specialization for general GALLIC weight.
+template <class L, class W, class D>
+class GallicCommonDivisor<L, W, GALLIC, D> {
+ public:
+  typedef GallicWeight<L, W, GALLIC> Weight;
+  typedef GallicWeight<L, W, GALLIC_RESTRICT> GRWeight;
+  typedef UnionWeightIterator<GRWeight, GallicUnionWeightOptions<L, W> > Iter;
+
+  Weight operator()(const Weight &w1, const Weight &w2) const {
+    GRWeight w = GRWeight::Zero();
+    for (Iter iter(w1); !iter.Done(); iter.Next())
+      w = common_divisor_(w, iter.Value());
+    for (Iter iter(w2); !iter.Done(); iter.Next())
+      w = common_divisor_(w, iter.Value());
+    return w == GRWeight::Zero() ? Weight::Zero() : Weight(w);
+  }
+
+ private:
+  GallicCommonDivisor<L, W, GALLIC_RESTRICT, D> common_divisor_;
+};
 
 // Represents an element in a subset
 template <class A>
@@ -124,198 +146,259 @@ struct DeterminizeElement {
     return state_id == element.state_id && weight == element.weight;
   }
 
+  bool operator!=(const DeterminizeElement<A> & element) const {
+    return !(*this == element);
+  }
+
   bool operator<(const DeterminizeElement<A> & element) const {
-    return state_id < element.state_id ||
-        (state_id == element.state_id && weight == element.weight);
+    return state_id < element.state_id;
   }
 
   StateId state_id;  // Input state Id
   Weight weight;     // Residual weight
 };
 
+// Represents a weighted subset and determinization filter state
+template <typename A, typename F>
+struct DeterminizeStateTuple {
+  typedef A Arc;
+  typedef F FilterState;
+  typedef DeterminizeElement<Arc> Element;
+  typedef std::forward_list<Element> Subset;
+
+  DeterminizeStateTuple() : filter_state(FilterState::NoState()) { }
+
+  bool operator==(const DeterminizeStateTuple<A, F> &tuple) const {
+    return (tuple.filter_state == filter_state) && (tuple.subset == subset);
+  }
+
+  bool operator!=(const DeterminizeStateTuple<A, F> &tuple) const {
+    return (tuple.filter_state != filter_state) || (tuple.subset != subset);
+  }
+
+  Subset subset;
+  FilterState filter_state;
+};
+
+// Proto-transition for determinization
+template <class S>
+struct DeterminizeArc {
+  typedef S StateTuple;
+  typedef typename S::Arc Arc;
+  typedef typename Arc::Label Label;
+  typedef typename Arc::Weight Weight;
+
+  DeterminizeArc()
+    : label(kNoLabel), weight(Weight::Zero()), dest_tuple(0) {}
+
+  explicit DeterminizeArc(const Arc &arc)
+    : label(arc.ilabel),
+      weight(Weight::Zero()),
+      dest_tuple(new S) { }
+
+  Label label;                // arc label
+  Weight weight;              // arc weight
+  StateTuple *dest_tuple;     // destination subset and filter state
+};
 
 //
-// DETERMINIZE FILTERS - these can be used in determinization to compute
-// transformations on the subsets prior to their being added as destination
-// states. The filter operates on a map between a label and the
-// corresponding destination subsets. The possibly modified map is
-// then used to construct the destination states for arcs exiting state 's'.
-// It must define the ordered map type LabelMap and have a default
-// and copy constructor.
+// DETERMINIZE FILTERS - these are used in determinization to compute
+// destination state tuples based on the source tuple, transition, and
+// destination element or on similar super-final transition
+// information. The filter operates on a map between a label and the
+// corresponding destination state tuples. It must define the map type
+// LabelMap. The default filter is used for weighted determinization.
+//
 
-// A determinize filter that does not modify its input.
+// A determinize filter for implementing weighted determinization.
 template <class Arc>
-struct IdentityDeterminizeFilter {
+class DefaultDeterminizeFilter {
+ public:
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Label Label;
-  typedef slist< DeterminizeElement<Arc> > Subset;
-  typedef map<Label, Subset*> LabelMap;
+  typedef typename Arc::Weight Weight;
+  typedef CharFilterState FilterState;
+
+  typedef DeterminizeElement<Arc> Element;
+  typedef DeterminizeStateTuple<Arc, FilterState> StateTuple;
+  typedef map<Label, DeterminizeArc<StateTuple> > LabelMap;
+
+  // This is needed e.g. to go into the gallic domain for transducers.
+  template <class A>
+  struct rebind { typedef DefaultDeterminizeFilter<A> other; };
+
+  DefaultDeterminizeFilter(const Fst<Arc> &fst)
+      : fst_(fst.Copy()) { }
+
+  // This is needed e.g. to go into the gallic domain for transducers.
+  // Ownership of the templated filter argument is given to this class.
+  template <class F>
+  DefaultDeterminizeFilter(const Fst<Arc> &fst, F* filter)
+      : fst_(fst.Copy()) {
+    delete filter;
+  }
+
+  // Copy ctr. The FST can be passed if it has been e.g. (deep) copied.
+  explicit DefaultDeterminizeFilter(
+      const DefaultDeterminizeFilter<Arc> &filter,
+      const Fst<Arc> *fst = 0)
+      : fst_(fst ? fst->Copy() : filter.fst_->Copy()) { }
+
+  ~DefaultDeterminizeFilter() { delete fst_; }
+
+  FilterState Start() const { return FilterState(0); }
+
+  void SetState(StateId s, const StateTuple &tuple) { }
+
+  // Filters transition, possibly modifying label map. Returns
+  // true if arc is added to label map.
+  bool FilterArc(const Arc &arc,
+                 const Element &src_element,
+                 const Element &dest_element,
+                 LabelMap *label_map) const {
+    // Adds element to unique state tuple for arc label; create if necessary
+    DeterminizeArc<StateTuple> &det_arc = (*label_map)[arc.ilabel];
+    if (det_arc.label == kNoLabel) {
+      det_arc = DeterminizeArc<StateTuple>(arc);
+      det_arc.dest_tuple->filter_state = FilterState(0);
+    }
+    det_arc.dest_tuple->subset.push_front(dest_element);
+    return true;
+  }
+
+  // Filters super-final transition, returning new final weight
+  Weight FilterFinal(Weight final_weight, const Element &element) {
+    return final_weight;
+  }
 
   static uint64 Properties(uint64 props) { return props; }
 
-  void operator()(StateId s, LabelMap *label_map) {}
+ private:
+  Fst<Arc> *fst_;
+  void operator=(const DefaultDeterminizeFilter<Arc> &);  // disallow
 };
-
 
 //
 // DETERMINIZATION STATE TABLES
 //
-// The determiziation state table has the form:
+// The determinization state table has the form:
 //
-// template <class Arc>
+// template <class A, class F>
 // class DeterminizeStateTable {
 //  public:
+//   typename A Arc;
+//   typename F FilterState;
 //   typedef typename Arc::StateId StateId;
-//   typedef DeterminizeElement<Arc> Element;
-//   typedef slist<Element> Subset;
+//   typedef DeterminizeStateTuple<Arc, FilterState> StateTuple;
+//
+//   // Required sub-class. This is needed e.g. to go into the gallic domain.
+//   template <class B, class G>
+//   struct rebind { typedef DeterminizeStateTable<B, G> other; };
 //
 //   // Required constuctor
 //   DeterminizeStateTable();
 //
 //   // Required copy constructor that does not copy state
-//   DeterminizeStateTable(const DeterminizeStateTable<A,P> &table);
+//   DeterminizeStateTable(const DeterminizeStateTable<A,F> &table);
 //
-//   // Lookup state ID by subset (not depending of the element order).
-//   // If it doesn't exist, then add it.  FindState takes
-//   // ownership of the subset argument (so that it doesn't have to
+//   // Lookup state ID by state tuple.
+//   // If it doesn't exist, then add it. FindState takes ownership
+//   // of the state tuple argument (so that it doesn't have to
 //   // copy it if it creates a new state).
-//   StateId FindState(Subset *subset);
+//   StateId FindState(StateTuple *tuple);
 //
-//   // Lookup subset by ID.
-//   const Subset *FindSubset(StateId id) const;
+//   // Lookup state tuple by ID.
+//   const StateTuple *Tuple(StateId id) const;
 // };
-//
 
 // The default determinization state table based on the
 // compact hash bi-table.
-template <class Arc>
+template <class A, class F>
 class DefaultDeterminizeStateTable {
  public:
+  typedef A Arc;
+  typedef F FilterState;
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Label Label;
   typedef typename Arc::Weight Weight;
-  typedef DeterminizeElement<Arc> Element;
-  typedef slist<Element> Subset;
+  typedef DeterminizeStateTuple<Arc, FilterState> StateTuple;
+  typedef typename StateTuple::Subset Subset;
+  typedef typename StateTuple::Element Element;
+
+  template <class B, class G>
+  struct rebind { typedef DefaultDeterminizeStateTable<B, G> other; };
 
   explicit DefaultDeterminizeStateTable(size_t table_size = 0)
-      : table_size_(table_size),
-        subsets_(table_size_, new SubsetKey(), new SubsetEqual(&elements_)) { }
+      : table_size_(table_size), tuples_(table_size_) { }
 
-  DefaultDeterminizeStateTable(const DefaultDeterminizeStateTable<Arc> &table)
-      : table_size_(table.table_size_),
-        subsets_(table_size_, new SubsetKey(), new SubsetEqual(&elements_)) { }
+  DefaultDeterminizeStateTable(const DefaultDeterminizeStateTable<A, F> &table)
+      : table_size_(table.table_size_), tuples_(table_size_) { }
 
   ~DefaultDeterminizeStateTable() {
-    for (StateId s = 0; s < subsets_.Size(); ++s)
-      delete subsets_.FindEntry(s);
+    for (StateId s = 0; s < tuples_.Size(); ++s)
+      delete tuples_.FindEntry(s);
   }
 
-  // Finds the state corresponding to a subset. Only creates a new
-  // state if the subset is not found. FindState takes ownership of
-  // the subset argument (so that it doesn't have to copy it if it
+  // Finds the state corresponding to a state tuple. Only creates a new
+  // state if the tuple is not found. FindState takes ownership of
+  // the tuple argument (so that it doesn't have to copy it if it
   // creates a new state).
-  StateId FindState(Subset *subset) {
-    StateId ns = subsets_.Size();
-    StateId s = subsets_.FindId(subset);
-    if (s != ns) delete subset;  // subset found
+  StateId FindState(StateTuple *tuple) {
+    StateId ns = tuples_.Size();
+    StateId s = tuples_.FindId(tuple);
+
+    if (s != ns) delete tuple;  // tuple found
     return s;
   }
 
-  const Subset* FindSubset(StateId s) { return subsets_.FindEntry(s); }
+  const StateTuple* Tuple(StateId s) { return tuples_.FindEntry(s); }
 
  private:
-  // Comparison object for hashing Subset(s). Subsets are not sorted in this
-  // implementation, so ordering must not be assumed in the equivalence
-  // test.
-  class SubsetEqual {
+  // Comparison object for StateTuples.
+  class StateTupleEqual {
    public:
-    SubsetEqual() {  // needed for compilation but should never be called
-      FSTERROR() << "SubsetEqual: default constructor not implemented";
+    bool operator()(const StateTuple* tuple1, const StateTuple* tuple2) const {
+      return *tuple1 == *tuple2;
     }
-
-    // Constructor takes vector needed to check equality. See immediately
-    // below for constraints on it.
-    explicit SubsetEqual(vector<Element *> *elements)
-        : elements_(elements) {}
-
-    // At each call to operator(), the elements_ vector should contain
-    // only NULLs. When this operator returns, elements_ will still
-    // have this property.
-    bool operator()(Subset* subset1, Subset* subset2) const {
-      if (!subset1 && !subset2)
-        return true;
-      if ((subset1 && !subset2) || (!subset1 && subset2))
-        return false;
-
-      if (subset1->size() != subset2->size())
-        return false;
-
-      // Loads first subset elements in element vector.
-      for (typename Subset::iterator iter1 = subset1->begin();
-           iter1 != subset1->end();
-           ++iter1) {
-        Element &element1 = *iter1;
-        while (elements_->size() <= element1.state_id)
-          elements_->push_back(0);
-        (*elements_)[element1.state_id] = &element1;
-      }
-
-      // Checks second subset matches first via element vector.
-      for (typename Subset::iterator iter2 = subset2->begin();
-           iter2 != subset2->end();
-           ++iter2) {
-        Element &element2 = *iter2;
-        while (elements_->size() <= element2.state_id)
-          elements_->push_back(0);
-        Element *element1 = (*elements_)[element2.state_id];
-        if (!element1 || element1->weight != element2.weight) {
-          // Mismatch found. Resets element vector before returning false.
-          for (typename Subset::iterator iter1 = subset1->begin();
-               iter1 != subset1->end();
-               ++iter1)
-            (*elements_)[iter1->state_id] = 0;
-          return false;
-        } else {
-          (*elements_)[element2.state_id] = 0;  // Clears entry
-        }
-      }
-      return true;
-    }
-   private:
-    vector<Element *> *elements_;
   };
 
-  // Hash function for Subset to Fst states. Subset elements are not
-  // sorted in this implementation, so the hash must be invariant
-  // under subset reordering.
-  class SubsetKey {
+  // Hash function for StateTuples.
+  class StateTupleKey {
    public:
-    size_t operator()(const Subset* subset) const {
-      size_t hash = 0;
-      if (subset) {
-        for (typename Subset::const_iterator iter = subset->begin();
-             iter != subset->end();
-             ++iter) {
-          const Element &element = *iter;
-          int lshift = element.state_id % (CHAR_BIT * sizeof(size_t) - 1) + 1;
-          int rshift = CHAR_BIT * sizeof(size_t) - lshift;
-          size_t n = element.state_id;
-          hash ^= n << lshift ^ n >> rshift ^ element.weight.Hash();
-        }
-      }
-      return hash;
+    size_t operator()(const StateTuple* tuple) const {
+      size_t h = tuple->filter_state.Hash();
+      for (typename Subset::const_iterator iter = tuple->subset.begin();
+           iter != tuple->subset.end();
+           ++iter) {
+        const Element &element = *iter;
+        size_t h1 = element.state_id;
+        size_t h2 = element.weight.Hash();
+        const int lshift = 5;
+        const int rshift = CHAR_BIT * sizeof(size_t) - 5;
+        h ^= h << 1 ^ h1 << lshift ^ h1 >> rshift ^ h2;
+     }
+      return h;
     }
   };
 
   size_t table_size_;
 
-  typedef CompactHashBiTable<StateId, Subset *,
-                             SubsetKey, SubsetEqual, HS_STL>  SubsetTable;
+  typedef CompactHashBiTable<StateId, StateTuple *,
+                             StateTupleKey, StateTupleEqual,
+                             HS_STL>  StateTupleTable;
 
-  SubsetTable subsets_;
-  vector<Element *> elements_;
+  StateTupleTable tuples_;
 
-  void operator=(const DefaultDeterminizeStateTable<Arc> &);  // disallow
+  void operator=(const DefaultDeterminizeStateTable<A, F> &);  // disallow
+};
+
+
+// Type of determinization
+enum DeterminizeType {
+  DETERMINIZE_FUNCTIONAL,     // Input transducer is functional (error if not)
+  DETERMINIZE_NONFUNCTIONAL,  // Input transducer is not known to be functional
+  DETERMINIZE_DISAMBIGUATE    // Input transducer is non-functional but only
+  // keep the min of ambiguous outputs.
 };
 
 // Options for finite-state transducer determinization templated on
@@ -324,26 +407,36 @@ class DefaultDeterminizeStateTable {
 // filter and state table if provided.
 template <class Arc,
           class D = DefaultCommonDivisor<typename Arc::Weight>,
-          class F = IdentityDeterminizeFilter<Arc>,
-          class T = DefaultDeterminizeStateTable<Arc> >
+          class F = DefaultDeterminizeFilter<Arc>,
+          class T = DefaultDeterminizeStateTable<Arc,
+                                                 typename F::FilterState> >
 struct DeterminizeFstOptions : CacheOptions {
   typedef typename Arc::Label Label;
   float delta;                // Quantization delta for subset weights
   Label subsequential_label;  // Label used for residual final output
                               // when producing subsequential transducers.
+  DeterminizeType type;       // Determinization type
+  bool increment_subsequential_label;  // When creating several subsequential
+                                       // arcs at a given state, make their
+                                       // label distinct by incrementing.
   F *filter;                  // Determinization filter
   T *state_table;             // Determinization state table
 
   explicit DeterminizeFstOptions(const CacheOptions &opts,
                                  float del = kDelta, Label lab = 0,
-                                 F *filt = 0,
-                                 T *table = 0)
+                                 DeterminizeType typ = DETERMINIZE_FUNCTIONAL,
+                                 bool inc_lab = false,
+                                 F *filt = 0, T *table = 0)
       : CacheOptions(opts), delta(del), subsequential_label(lab),
+        type(typ), increment_subsequential_label(inc_lab),
         filter(filt), state_table(table) {}
 
   explicit DeterminizeFstOptions(float del = kDelta, Label lab = 0,
+                                 DeterminizeType typ = DETERMINIZE_FUNCTIONAL,
+                                 bool inc_lab = false,
                                  F *filt = 0, T *table = 0)
-      : delta(del), subsequential_label(lab), filter(filt),
+      : delta(del), subsequential_label(lab), type(typ),
+        increment_subsequential_label(inc_lab), filter(filt),
         state_table(table) {}
 };
 
@@ -368,7 +461,8 @@ class DeterminizeFstImplBase : public CacheImpl<A> {
   typedef typename A::Label Label;
   typedef typename A::Weight Weight;
   typedef typename A::StateId StateId;
-  typedef CacheState<A> State;
+  typedef DefaultCacheStore<A> Store;
+  typedef typename Store::State State;
 
   template <class D, class F, class T>
   DeterminizeFstImplBase(const Fst<A> &fst,
@@ -376,8 +470,11 @@ class DeterminizeFstImplBase : public CacheImpl<A> {
       : CacheImpl<A>(opts), fst_(fst.Copy()) {
     SetType("determinize");
     uint64 iprops = fst.Properties(kFstProperties, false);
-    uint64 dprops = DeterminizeProperties(iprops,
-                                          opts.subsequential_label != 0);
+    uint64 dprops = DeterminizeProperties(
+        iprops,
+        opts.subsequential_label != 0,
+        opts.type == DETERMINIZE_NONFUNCTIONAL ?
+        opts.increment_subsequential_label : true);
     SetProperties(F::Properties(dprops), kCopyProperties);
     SetInputSymbols(fst.InputSymbols());
     SetOutputSymbols(fst.OutputSymbols());
@@ -465,8 +562,10 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
   typedef typename A::Label Label;
   typedef typename A::Weight Weight;
   typedef typename A::StateId StateId;
-  typedef DeterminizeElement<A> Element;
-  typedef slist<Element> Subset;
+  typedef typename F::FilterState FilterState;
+  typedef DeterminizeStateTuple<A, FilterState> StateTuple;
+  typedef typename StateTuple::Element Element;
+  typedef typename StateTuple::Subset Subset;
   typedef typename F::LabelMap LabelMap;
 
   DeterminizeFsaImpl(const Fst<A> &fst,
@@ -476,7 +575,7 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
         delta_(opts.delta),
         in_dist_(in_dist),
         out_dist_(out_dist),
-        filter_(opts.filter ? opts.filter : new F()),
+        filter_(opts.filter ? opts.filter : new F(fst)),
         state_table_(opts.state_table ? opts.state_table : new T()) {
     if (!fst.Properties(kAcceptor, true)) {
       FSTERROR()  << "DeterminizeFst: argument not an acceptor";
@@ -496,7 +595,7 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
         delta_(impl.delta_),
         in_dist_(0),
         out_dist_(0),
-        filter_(new F(*impl.filter_)),
+        filter_(new F(*impl.filter_, &GetFst())),
         state_table_(new T(*impl.state_table_)) {
     if (impl.out_dist_) {
       FSTERROR() << "DeterminizeFsaImpl: cannot copy with out_dist vector";
@@ -527,39 +626,43 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
     if (s == kNoStateId)
       return kNoStateId;
     Element element(s, Weight::One());
-    Subset *subset = new Subset;
-    subset->push_front(element);
-    return FindState(subset);
+    StateTuple *tuple = new StateTuple;
+    tuple->subset.push_front(element);
+    tuple->filter_state = filter_->Start();
+    return FindState(tuple);
   }
 
   virtual Weight ComputeFinal(StateId s) {
-    const Subset *subset = state_table_->FindSubset(s);
+    const StateTuple *tuple = state_table_->Tuple(s);
+    filter_->SetState(s, *tuple);
+
     Weight final = Weight::Zero();
-    for (typename Subset::const_iterator siter = subset->begin();
-         siter != subset->end();
+    for (typename Subset::const_iterator siter = tuple->subset.begin();
+         siter != tuple->subset.end();
          ++siter) {
       const Element &element = *siter;
       final = Plus(final, Times(element.weight,
                                 GetFst().Final(element.state_id)));
+      final = filter_->FilterFinal(final, element);
       if (!final.Member())
         SetProperties(kError, kError);
     }
     return final;
   }
 
-  StateId FindState(Subset *subset) {
-    StateId s = state_table_->FindState(subset);
+  StateId FindState(StateTuple *tuple) {
+    StateId s = state_table_->FindState(tuple);
     if (in_dist_ && out_dist_->size() <= s)
-      out_dist_->push_back(ComputeDistance(subset));
+      out_dist_->push_back(ComputeDistance(tuple->subset));
     return s;
   }
 
   // Compute distance from a state to the final states in the DFA
   // given the distances in the NFA.
-  Weight ComputeDistance(const Subset *subset) {
+  Weight ComputeDistance(const Subset &subset) {
     Weight outd = Weight::Zero();
-    for (typename Subset::const_iterator siter = subset->begin();
-         siter != subset->end(); ++siter) {
+    for (typename Subset::const_iterator siter = subset.begin();
+         siter != subset.end(); ++siter) {
       const Element &element = *siter;
       Weight ind = element.state_id < in_dist_->size() ?
           (*in_dist_)[element.state_id] : Weight::Zero();
@@ -571,26 +674,25 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
   // Computes the outgoing transitions from a state, creating new destination
   // states as needed.
   virtual void Expand(StateId s) {
-
     LabelMap label_map;
-    LabelSubsets(s, &label_map);
+    GetLabelMap(s, &label_map);
 
     for (typename LabelMap::iterator liter = label_map.begin();
          liter != label_map.end();
-         ++liter)
-      AddArc(s, liter->first, liter->second);
+         ++liter) {
+      AddArc(s, liter->second);
+    }
     SetArcs(s);
   }
 
  private:
-  // Constructs destination subsets per label. At return, subset
-  // element weights include the input automaton label weights and the
-  // subsets may contain duplicate states.
-  void LabelSubsets(StateId s, LabelMap *label_map) {
-    const Subset *src_subset = state_table_->FindSubset(s);
-
-    for (typename Subset::const_iterator siter = src_subset->begin();
-         siter != src_subset->end();
+  // Constructs proto determinization transition, including
+  // destination subset, per label.
+  void GetLabelMap(StateId s, LabelMap *label_map) {
+    const StateTuple *src_tuple = state_table_->Tuple(s);
+    filter_->SetState(s, *src_tuple);
+    for (typename Subset::const_iterator siter = src_tuple->subset.begin();
+         siter != src_tuple->subset.end();
          ++siter) {
       const Element &src_element = *siter;
       for (ArcIterator< Fst<A> > aiter(GetFst(), src_element.state_id);
@@ -598,74 +700,65 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
            aiter.Next()) {
         const A &arc = aiter.Value();
         Element dest_element(arc.nextstate,
-                             Times(src_element.weight, arc.weight));
-
-        // The LabelMap may be a e.g. multimap with more complex
-        // determinization filters, so we insert efficiently w/o using [].
-        typename LabelMap::iterator liter = label_map->lower_bound(arc.ilabel);
-        Subset* dest_subset;
-        if (liter == label_map->end() || liter->first != arc.ilabel) {
-          dest_subset = new Subset;
-          label_map->insert(liter, make_pair(arc.ilabel, dest_subset));
-        } else {
-          dest_subset = liter->second;
-        }
-
-        dest_subset->push_front(dest_element);
+                            Times(src_element.weight, arc.weight));
+        filter_->FilterArc(arc, src_element, dest_element, label_map);
       }
     }
-    // Applies the determinization filter
-    (*filter_)(s, label_map);
+
+    for (typename LabelMap::iterator liter = label_map->begin();
+         liter != label_map->end();
+         ++liter) {
+      NormArc(&liter->second);
+    }
   }
 
-  // Adds an arc from state S to the destination state associated
-  // with subset DEST_SUBSET (as created by LabelSubsets).
-  void AddArc(StateId s, Label label, Subset *dest_subset) {
-    A arc;
-    arc.ilabel = label;
-    arc.olabel = label;
-    arc.weight = Weight::Zero();
-
-    typename Subset::iterator oiter;
-    for (typename Subset::iterator diter = dest_subset->begin();
-         diter != dest_subset->end();) {
+  // Sorts subsets and removes duplicate elements.
+  // Normalizes transition and subset weights.
+  void NormArc(DeterminizeArc<StateTuple> *det_arc) {
+    StateTuple *dest_tuple = det_arc->dest_tuple;
+    dest_tuple->subset.sort();
+    typename Subset::iterator piter = dest_tuple->subset.begin();
+    for (typename Subset::iterator diter = dest_tuple->subset.begin();
+         diter != dest_tuple->subset.end();) {
       Element &dest_element = *diter;
-      // Computes label weight.
-      arc.weight = common_divisor_(arc.weight, dest_element.weight);
+      Element &prev_element = *piter;
+      // Computes arc weight.
+      det_arc->weight = common_divisor_(det_arc->weight, dest_element.weight);
 
-      while (elements_.size() <= dest_element.state_id)
-        elements_.push_back(0);
-      Element *matching_element = elements_[dest_element.state_id];
-      if (matching_element) {
+      if (piter != diter && dest_element.state_id == prev_element.state_id) {
         // Found duplicate state: sums state weight and deletes dup.
-        matching_element->weight = Plus(matching_element->weight,
-                                        dest_element.weight);
-        if (!matching_element->weight.Member())
+        prev_element.weight = Plus(prev_element.weight,
+                                   dest_element.weight);
+        if (!prev_element.weight.Member())
           SetProperties(kError, kError);
         ++diter;
-        dest_subset->erase_after(oiter);
+        dest_tuple->subset.erase_after(piter);
       } else {
-        // Saves element so we can check for duplicate for this state.
-        elements_[dest_element.state_id] = &dest_element;
-        oiter = diter;
+        piter = diter;
         ++diter;
       }
     }
 
     // Divides out label weight from destination subset elements.
     // Quantizes to ensure comparisons are effective.
-    // Clears element vector.
-    for (typename Subset::iterator diter = dest_subset->begin();
-         diter != dest_subset->end();
+    for (typename Subset::iterator diter = dest_tuple->subset.begin();
+         diter != dest_tuple->subset.end();
          ++diter) {
       Element &dest_element = *diter;
-      dest_element.weight = Divide(dest_element.weight, arc.weight,
+      dest_element.weight = Divide(dest_element.weight, det_arc->weight,
                                    DIVIDE_LEFT);
       dest_element.weight = dest_element.weight.Quantize(delta_);
-      elements_[dest_element.state_id] = 0;
     }
+  }
 
-    arc.nextstate = FindState(dest_subset);
+  // Adds an arc from state S to the destination state associated
+  // with state tuple in DET_ARC (as created by GetLabelMap).
+  void AddArc(StateId s, const DeterminizeArc<StateTuple> &det_arc) {
+    A arc;
+    arc.ilabel = det_arc.label;
+    arc.olabel = det_arc.label;
+    arc.weight = det_arc.weight;
+    arc.nextstate = FindState(det_arc.dest_tuple);
     CacheImpl<A>::PushArc(s, arc);
   }
 
@@ -677,8 +770,6 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
   F *filter_;
   T *state_table_;
 
-  vector<Element *> elements_;
-
   void operator=(const DeterminizeFsaImpl<A, D, F, T> &);  // disallow
 };
 
@@ -688,7 +779,7 @@ class DeterminizeFsaImpl : public DeterminizeFstImplBase<A> {
 // the Gallic semiring as an acceptor whose weights contain the output
 // strings and using acceptor determinization above to determinize
 // that acceptor.
-template <class A, StringType S, class D, class F, class T>
+template <class A, GallicType G, class D, class F, class T>
 class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
  public:
   using FstImpl<A>::SetProperties;
@@ -700,35 +791,46 @@ class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
   typedef typename A::Weight Weight;
   typedef typename A::StateId StateId;
 
-  typedef ToGallicMapper<A, S> ToMapper;
-  typedef FromGallicMapper<A, S> FromMapper;
+  typedef ToGallicMapper<A, G> ToMapper;
+  typedef FromGallicMapper<A, G> FromMapper;
 
   typedef typename ToMapper::ToArc ToArc;
   typedef ArcMapFst<A, ToArc, ToMapper> ToFst;
   typedef ArcMapFst<ToArc, A, FromMapper> FromFst;
 
-  typedef GallicCommonDivisor<Label, Weight, S, D> CommonDivisor;
-  typedef GallicFactor<Label, Weight, S> FactorIterator;
+  typedef GallicCommonDivisor<Label, Weight, G, D> ToD;
+  typedef typename F::template rebind<ToArc>::other ToF;
+  typedef typename ToF::FilterState ToFilterState;
+  typedef typename T::template rebind<ToArc, ToFilterState>::other ToT;
+  typedef GallicFactor<Label, Weight, G> FactorIterator;
 
   DeterminizeFstImpl(const Fst<A> &fst,
                      const DeterminizeFstOptions<A, D, F, T> &opts)
       : DeterminizeFstImplBase<A>(fst, opts),
         delta_(opts.delta),
-        subsequential_label_(opts.subsequential_label) {
-     Init(GetFst());
+        subsequential_label_(opts.subsequential_label),
+        increment_subsequential_label_(opts.increment_subsequential_label) {
+    if (opts.state_table) {
+      FSTERROR() << "DeterminizeFst: "
+                 << "a state table can not be passed with transducer input";
+      SetProperties(kError, kError);
+      return;
+    }
+    Init(GetFst(), opts.filter);
   }
 
-  DeterminizeFstImpl(const DeterminizeFstImpl<A, S, D, F, T> &impl)
+  DeterminizeFstImpl(const DeterminizeFstImpl<A, G, D, F, T> &impl)
       : DeterminizeFstImplBase<A>(impl),
         delta_(impl.delta_),
-        subsequential_label_(impl.subsequential_label_) {
-    Init(GetFst());
+        subsequential_label_(impl.subsequential_label_),
+        increment_subsequential_label_(impl.increment_subsequential_label_) {
+    Init(GetFst(), 0);
   }
 
   ~DeterminizeFstImpl() { delete from_fst_; }
 
-  virtual DeterminizeFstImpl<A, S, D, F, T> *Copy() {
-    return new DeterminizeFstImpl<A, S, D, F, T>(*this);
+  virtual DeterminizeFstImpl<A, G, D, F, T> *Copy() {
+    return new DeterminizeFstImpl<A, G, D, F, T>(*this);
   }
 
   uint64 Properties() const { return Properties(kFstProperties); }
@@ -756,13 +858,14 @@ class DeterminizeFstImpl : public DeterminizeFstImplBase<A> {
  private:
   // Initialization of transducer determinization implementation, which
   // is defined after DeterminizeFst since it calls it.
-  void Init(const Fst<A> &fst);
+  void Init(const Fst<A> &fst, F *filter);
 
   float delta_;
   Label subsequential_label_;
+  bool increment_subsequential_label_;
   FromFst *from_fst_;
 
-  void operator=(const DeterminizeFstImpl<A, S, D, F, T> &);  // disallow
+  void operator=(const DeterminizeFstImpl<A, G, D, F, T> &);  // disallow
 };
 
 
@@ -793,44 +896,31 @@ class DeterminizeFst : public ImplToFst< DeterminizeFstImplBase<A> >  {
  public:
   friend class ArcIterator< DeterminizeFst<A> >;
   friend class StateIterator< DeterminizeFst<A> >;
-  template <class B, StringType S, class D, class F, class T>
+  template <class B, GallicType G, class D, class F, class T>
   friend class DeterminizeFstImpl;
 
   typedef A Arc;
   typedef typename A::Weight Weight;
   typedef typename A::StateId StateId;
   typedef typename A::Label Label;
-  typedef CacheState<A> State;
+  typedef DefaultCacheStore<A> Store;
+  typedef typename Store::State State;
   typedef DeterminizeFstImplBase<A> Impl;
-
   using ImplToFst<Impl>::SetImpl;
 
   explicit DeterminizeFst(const Fst<A> &fst) {
     typedef DefaultCommonDivisor<Weight> D;
-    typedef IdentityDeterminizeFilter<A> F;
-    typedef DefaultDeterminizeStateTable<A> T;
+    typedef DefaultDeterminizeFilter<A> F;
+    typedef typename F::FilterState FilterState;
+    typedef DefaultDeterminizeStateTable<A, FilterState> T;
     DeterminizeFstOptions<A, D, F, T> opts;
-    if (fst.Properties(kAcceptor, true)) {
-      // Calls implementation for acceptors.
-      SetImpl(new DeterminizeFsaImpl<A, D, F, T>(fst, 0, 0, opts));
-    } else {
-      // Calls implementation for transducers.
-      SetImpl(new
-              DeterminizeFstImpl<A, STRING_LEFT_RESTRICT, D, F, T>(fst, opts));
-    }
+    Init(fst, opts);
   }
 
   template <class D, class F, class T>
   DeterminizeFst(const Fst<A> &fst,
                  const DeterminizeFstOptions<A, D, F, T> &opts) {
-    if (fst.Properties(kAcceptor, true)) {
-      // Calls implementation for acceptors.
-      SetImpl(new DeterminizeFsaImpl<A, D, F, T>(fst, 0, 0, opts));
-    } else {
-      // Calls implementation for transducers.
-      SetImpl(new
-              DeterminizeFstImpl<A, STRING_LEFT_RESTRICT, D, F, T>(fst, opts));
-    }
+    Init(fst, opts);
   }
 
   // This acceptor-only version additionally computes the distance to
@@ -849,7 +939,8 @@ class DeterminizeFst : public ImplToFst< DeterminizeFstImplBase<A> >  {
   }
 
   // See Fst<>::Copy() for doc.
-  DeterminizeFst(const DeterminizeFst<A> &fst, bool safe = false) {
+  DeterminizeFst(const DeterminizeFst<A> &fst, bool safe = false)
+      : ImplToFst<Impl>() {
     if (safe)
       SetImpl(fst.GetImpl()->Copy());
     else
@@ -868,6 +959,33 @@ class DeterminizeFst : public ImplToFst< DeterminizeFstImplBase<A> >  {
   }
 
  private:
+  template <class D, class F, class T>
+  void Init(const Fst<Arc> &fst,
+            const DeterminizeFstOptions<A, D, F, T> &opts) {
+    if (fst.Properties(kAcceptor, true)) {
+      // Calls implementation for acceptors.
+      SetImpl(new DeterminizeFsaImpl<A, D, F, T>(fst, 0, 0, opts));
+    } else if (opts.type == DETERMINIZE_DISAMBIGUATE) {
+      if (!(Weight::Properties() & kPath)) {
+        FSTERROR() << "DeterminizeFst: Weight needs to have the "
+                   << "path property to disambiguate output: "
+                   << Weight::Type();
+        GetImpl()->SetProperties(kError, kError);
+      }
+      // Calls disambiguating implementation for non-functional transducers.
+      SetImpl(new
+              DeterminizeFstImpl<A, GALLIC_MIN, D, F, T>(fst, opts));
+    } else if (opts.type == DETERMINIZE_FUNCTIONAL) {
+      // Calls implementation for functional transducers.
+      SetImpl(new
+              DeterminizeFstImpl<A, GALLIC_RESTRICT, D, F, T>(fst, opts));
+    } else {  // opts.type == DETERMINIZE_NONFUNCTIONAL
+      // Calls implementation for non functional transducers;
+      SetImpl(new
+              DeterminizeFstImpl<A, GALLIC, D, F, T>(fst, opts));
+    }
+  }
+
   // Makes visible to friends.
   Impl *GetImpl() const { return ImplToFst<Impl>::GetImpl(); }
 
@@ -875,18 +993,20 @@ class DeterminizeFst : public ImplToFst< DeterminizeFstImplBase<A> >  {
 };
 
 
-// Initialization of transducer determinization implementation. which
+// Initialization of transducer determinization implementation, which
 // is defined after DeterminizeFst since it calls it.
-template <class A, StringType S, class D, class F, class T>
-void DeterminizeFstImpl<A, S, D, F, T>::Init(const Fst<A> &fst) {
+template <class A, GallicType G, class D, class F, class T>
+void DeterminizeFstImpl<A, G, D, F, T>::Init(const Fst<A> &fst,  F *filter) {
   // Mapper to an acceptor.
   ToFst to_fst(fst, ToMapper());
+  ToF *to_filter = filter ? new ToF(to_fst, filter) : 0;
 
   // Determinizes acceptor.
-  // This recursive call terminates since it passes the common divisor
-  // to a private constructor.
+  // This recursive call terminates since it is to a (non-recursive)
+  // different constructor.
   CacheOptions copts(GetCacheGc(), GetCacheLimit());
-  DeterminizeFstOptions<ToArc, CommonDivisor> dopts(copts, delta_);
+  DeterminizeFstOptions<ToArc, ToD, ToF, ToT>
+      dopts(copts, delta_, 0, DETERMINIZE_FUNCTIONAL, false, to_filter);
   // Uses acceptor-only constructor to avoid template recursion
   DeterminizeFst<ToArc> det_fsa(to_fst, 0, 0, dopts);
 
@@ -894,7 +1014,9 @@ void DeterminizeFstImpl<A, S, D, F, T>::Init(const Fst<A> &fst) {
   FactorWeightOptions<ToArc> fopts(CacheOptions(true, 0), delta_,
                                    kFactorFinalWeights,
                                    subsequential_label_,
-                                   subsequential_label_);
+                                   subsequential_label_,
+                                   increment_subsequential_label_,
+                                   increment_subsequential_label_);
   FactorWeightFst<ToArc, FactorIterator> factored_fst(det_fsa, fopts);
   from_fst_ = new FromFst(factored_fst, FromMapper(subsequential_label_));
 }
@@ -950,11 +1072,17 @@ struct DeterminizeOptions {
   StateId state_threshold;    // Pruning state threshold.
   Label subsequential_label;  // Label used for residual final output
   // when producing subsequential transducers.
+  DeterminizeType type;       // functional, nonfunctional, disambiguate?
+  bool increment_subsequential_label;  // When creating several subsequential
+  // arcs at a given state, make their label distinct by incrementing.
+
 
   explicit DeterminizeOptions(float d = kDelta, Weight w = Weight::Zero(),
-                              StateId n = kNoStateId, Label l = 0)
+                              StateId n = kNoStateId, Label l = 0,
+                              DeterminizeType t = DETERMINIZE_FUNCTIONAL,
+                              bool isl = false)
       : delta(d), weight_threshold(w), state_threshold(n),
-        subsequential_label(l) {}
+        subsequential_label(l), type(t), increment_subsequential_label(isl) {}
 };
 
 
@@ -986,6 +1114,8 @@ void Determinize(const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
   DeterminizeFstOptions<Arc> nopts;
   nopts.delta = opts.delta;
   nopts.subsequential_label = opts.subsequential_label;
+  nopts.type = opts.type;
+  nopts.increment_subsequential_label = opts.increment_subsequential_label;
 
   nopts.gc_limit = 0;  // Cache only the last state for fastest copy.
 
@@ -1008,7 +1138,6 @@ void Determinize(const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
     *ofst = DeterminizeFst<Arc>(ifst, nopts);
   }
 }
-
 
 }  // namespace fst
 

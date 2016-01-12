@@ -32,6 +32,7 @@
 #include <fst/types.h>
 
 #include <fst/arc.h>
+#include <fst/memory.h>
 #include <fst/properties.h>
 #include <fst/register.h>
 #include <iostream>
@@ -48,8 +49,8 @@ namespace fst {
 bool IsFstHeader(istream &, const string &);
 
 class FstHeader;
-template <class A> class StateIteratorData;
-template <class A> class ArcIteratorData;
+template <class A> struct StateIteratorData;
+template <class A> struct ArcIteratorData;
 template <class A> class MatcherBase;
 
 struct FstReadOptions {
@@ -66,6 +67,8 @@ struct FstReadOptions {
   const SymbolTable* osymbols;  // Pointer to output symbols. If non-zero, use
                                 // this info (read and skip stream osymbols)
   FileReadMode mode;            // Read or map files (advisory, if possible)
+  bool read_isymbols;           // Read isymbols, if any, default true
+  bool read_osymbols;           // Read osymbols, if any, default true
 
   explicit FstReadOptions(const string& src = "<unspecified>",
                           const FstHeader *hdr = 0,
@@ -78,6 +81,9 @@ struct FstReadOptions {
 
   // Helper function to convert strings FileReadModes into their enum value.
   static FileReadMode ReadMode(const string &mode);
+
+  // Outputs a debug string for the FstReadOptions object.
+  string DebugString() const;
 };
 
 struct FstWriteOptions {
@@ -130,6 +136,9 @@ class FstHeader {
 
   bool Read(istream &strm, const string &source, bool rewind = false);
   bool Write(ostream &strm, const string &source) const;
+
+  // Outputs a debug string for the FstHeader object.
+  string DebugString() const;
 
  private:
 
@@ -223,20 +232,21 @@ class Fst {
       return 0;
     }
     return reader(strm, ropts);
-  };
+  }
 
   // Read an Fst from a file; return NULL on error
   // Empty filename reads from standard input
   static Fst<A> *Read(const string &filename) {
     if (!filename.empty()) {
-      ifstream strm(filename.c_str(), ifstream::in | ifstream::binary);
+      ifstream strm(filename.c_str(),
+                    std::ios_base::in | std::ios_base::binary);
       if (!strm) {
         LOG(ERROR) << "Fst::Read: Can't open file: " << filename;
         return 0;
       }
       return Read(strm, FstReadOptions(filename));
     } else {
-      return Read(cin, FstReadOptions("standard input"));
+      return Read(std::cin, FstReadOptions("standard input"));
     }
   }
 
@@ -283,7 +293,7 @@ class Fst {
       }
       return Write(strm, FstWriteOptions(filename));
     } else {
-      return Write(cout, FstWriteOptions("standard output"));
+      return Write(std::cout, FstWriteOptions("standard output"));
     }
   }
 };
@@ -437,7 +447,6 @@ template <class A> struct ArcIteratorData {
   int *ref_count;            // ... and reference count if non-zero
 };
 
-
 // Generic arc iterator, templated on the FST definition
 // - a wrapper around pointer to specific one.
 // Here is a typical use: \code
@@ -520,6 +529,29 @@ class ArcIterator {
   size_t i_;
   DISALLOW_COPY_AND_ASSIGN(ArcIterator);
 };
+
+}  // namespace fst
+
+// ArcIterator placement operator new and destroy function.
+// new needs to be in the global namespace
+
+template <class F>
+void* operator new(size_t size,
+                   fst::MemoryPool< fst::ArcIterator<F> > *pool) {
+  return pool->Allocate();
+}
+
+namespace fst {
+
+template <class F>
+inline void Destroy(fst::ArcIterator<F> *aiter,
+                    fst::MemoryPool< fst::ArcIterator<F> > *pool) {
+  if (aiter) {
+    aiter->~ArcIterator<F>();
+    pool->Free(aiter);
+  }
+}
+
 
 //
 // MATCHER DEFINITIONS
@@ -756,7 +788,7 @@ template <class A> class FstImpl {
       LOG(ERROR) << "Fst::UpdateFstHeader: write failed: " << opts.source;
       return false;
     }
-    strm.seekp(0, ios_base::end);
+    strm.seekp(0, std::ios_base::end);
     if (!strm) {
       LOG(ERROR) << "Fst::UpdateFstHeader: write failed: " << opts.source;
       return false;
@@ -810,9 +842,14 @@ bool FstImpl<A>::ReadHeader(istream &strm, const FstReadOptions& opts,
   properties_ = hdr->Properties();
   if (hdr->GetFlags() & FstHeader::HAS_ISYMBOLS)
     isymbols_ = SymbolTable::Read(strm, opts.source);
+  // Input symbol table not wanted; delete
+  if (!opts.read_isymbols)
+    SetInputSymbols(0);
   if (hdr->GetFlags() & FstHeader::HAS_OSYMBOLS)
-    osymbols_ =SymbolTable::Read(strm, opts.source);
-
+    osymbols_ = SymbolTable::Read(strm, opts.source);
+  // Output symbol table not wanted; delete
+  if (!opts.read_osymbols)
+    SetOutputSymbols(0);
   if (opts.isymbols) {
     delete isymbols_;
     isymbols_ = opts.isymbols->Copy();
@@ -939,11 +976,21 @@ void FstToString(const Fst<A> &fst, string *result) {
 }
 
 template <class A>
+void FstToString(const Fst<A> &fst, string *result,
+                 const FstWriteOptions& options) {
+  ostringstream ostrm;
+  fst.Write(ostrm, options);
+  *result = ostrm.str();
+}
+
+template <class A>
 Fst<A> *StringToFst(const string &s) {
   istringstream istrm(s);
   return Fst<A>::Read(istrm, FstReadOptions("StringToFst"));
 }
 
 }  // namespace fst
+
+
 
 #endif  // FST_LIB_FST_H__

@@ -21,9 +21,9 @@
 #ifndef FST_EXTENSIONS_PDT_REVERSE_H__
 #define FST_EXTENSIONS_PDT_REVERSE_H__
 
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <vector>
 using std::vector;
 
@@ -47,8 +47,8 @@ void Reverse(const Fst<Arc> &ifst,
   // Exchanges open and close parenthesis pairs
   vector<pair<Label, Label> > relabel_pairs;
   for (size_t i = 0; i < parens.size(); ++i) {
-    relabel_pairs.push_back(make_pair(parens[i].first, parens[i].second));
-    relabel_pairs.push_back(make_pair(parens[i].second, parens[i].first));
+    relabel_pairs.push_back(std::make_pair(parens[i].first, parens[i].second));
+    relabel_pairs.push_back(std::make_pair(parens[i].second, parens[i].first));
   }
   Relabel(ofst, relabel_pairs, relabel_pairs);
 }

@@ -23,9 +23,13 @@
 #ifndef FST_LIB_STRING_H_
 #define FST_LIB_STRING_H_
 
+#include <sstream>
+
 #include <fst/compact-fst.h>
 #include <fst/icu.h>
 #include <fst/mutable-fst.h>
+#include <fst/util.h>
+
 
 DECLARE_string(fst_field_separator);
 
@@ -83,8 +87,10 @@ class StringCompiler {
       SplitToVector(c_str, separator.c_str(), &vec, true);
       for (size_t i = 0; i < vec.size(); ++i) {
         Label label;
-        if (!ConvertSymbolToLabel(vec[i], &label))
+        if (!ConvertSymbolToLabel(vec[i], &label)) {
+          delete[] c_str;
           return false;
+        }
         labels->push_back(label);
       }
       delete[] c_str;
@@ -116,7 +122,7 @@ class StringCompiler {
     vector<pair<Label, Weight> > compacts;
     compacts.reserve(labels.size());
     for (size_t i = 0; i < labels.size(); ++i)
-      compacts.push_back(make_pair(labels[i], Weight::One()));
+      compacts.push_back(std::make_pair(labels[i], Weight::One()));
     compacts.back().second = weight;
     fst->SetCompactElements(compacts.begin(), compacts.end());
   }

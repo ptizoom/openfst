@@ -1,5 +1,9 @@
-AC_INIT([OpenFst], [1.3.4], [help@www.openfst.org])
+AC_INIT([OpenFst], [1.5.0], [help@www.openfst.org])
+
 AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror])
+AM_PROG_AR
+
+CXXFLAGS="$CXXFLAGS -std=c++11"
 
 AC_PROG_CXX
 AC_DISABLE_STATIC
@@ -16,20 +20,19 @@ AC_CONFIG_FILES([
   src/test/Makefile
   src/extensions/Makefile
   src/extensions/compact/Makefile
+  src/extensions/compress/Makefile
   src/extensions/const/Makefile
   src/extensions/far/Makefile
+  src/extensions/linear/Makefile
   src/extensions/lookahead/Makefile
+  src/extensions/mpdt/Makefile
   src/extensions/ngram/Makefile
   src/extensions/pdt/Makefile
+  src/extensions/python/Makefile
   src/script/Makefile
 ])
 AC_CONFIG_MACRO_DIR([m4])
 AC_LANG([C++])
-
-AC_CHECK_TYPES([std::tr1::hash<long long unsigned>], [], [],
-               [[#include <tr1/unordered_map>]])
-AC_CHECK_TYPES([__gnu_cxx::slist<int>], [], [],
-               [[#include <ext/slist>]])
 
 AC_ARG_ENABLE(
 	[bin],
@@ -49,7 +52,16 @@ AC_ARG_ENABLE(
 	[],
 	[enable_compact_fsts=no])
 AM_CONDITIONAL([HAVE_COMPACT], [test "x$enable_compact_fsts" != xno])
-				
+
+AC_ARG_ENABLE(
+	[compress],
+	[AS_HELP_STRING(
+		[--enable-compress],
+		[enable compression extension])],
+	[],
+	[enable_compress=no])
+AM_CONDITIONAL([HAVE_COMPRESS], [test "x$enable_compress" != xno])
+
 AC_ARG_ENABLE(
 	[const-fsts],
 	[AS_HELP_STRING(
@@ -58,10 +70,36 @@ AC_ARG_ENABLE(
 	[],
 	[enable_const_fsts=no])
 AM_CONDITIONAL([HAVE_CONST], [test "x$enable_const_fsts" != xno])
-				
+
 AC_ARG_ENABLE([far], [AS_HELP_STRING([--enable-far], [enable FAR extensions])],
               [], [enable_far=no])
 AM_CONDITIONAL([HAVE_FAR], [test "x$enable_far" != xno])
+
+AC_ARG_ENABLE(
+	[linear-fsts],
+	[AS_HELP_STRING(
+		[--enable-linear-fsts],
+		[enable all LinearTagger/ClassifierFst extensions])],
+	[],
+	[enable_linear_fsts=no])
+AM_CONDITIONAL([HAVE_LINEAR], [test "x$enable_linear_fsts" != xno])
+
+AC_ARG_ENABLE(
+	[lookahead-fsts],
+	[AS_HELP_STRING(
+		[--enable-lookahead-fsts],
+		[enable LookAheadFst extensions])],
+	[],
+	[enable_lookahead_fsts=no])
+AM_CONDITIONAL([HAVE_LOOKAHEAD], [test "x$enable_lookahead_fsts" != xno])
+
+AC_ARG_ENABLE([mpdt], 
+              [AS_HELP_STRING(
+                [--enable-mpdt], 
+                [enable MPDT extensions])],
+              [],
+              [enable_mpdt=no])
+AM_CONDITIONAL([HAVE_MPDT], [test "x$enable_mpdt" != xno])
 
 AC_ARG_ENABLE(
 	[ngram-fsts],
@@ -72,18 +110,23 @@ AC_ARG_ENABLE(
 	[enable_ngram_fsts=no])
 AM_CONDITIONAL([HAVE_NGRAM], [test "x$enable_ngram_fsts" != xno])
 
-AC_ARG_ENABLE(
-	[lookahead-fsts],
-	[AS_HELP_STRING(
-		[--enable-lookahead-fsts],
-		[enable LookAheadFst extensions])],
-	[],
-	[enable_lookahead_fsts=no])
-AM_CONDITIONAL([HAVE_LOOKAHEAD], [test "x$enable_lookahead_fsts" != xno])
-				
-AC_ARG_ENABLE([pdt], [AS_HELP_STRING([--enable-pdt], [enable PDT extensions])],
-              [], [enable_pdt=no])
+AC_ARG_ENABLE([pdt], 
+              [AS_HELP_STRING([--enable-pdt], 
+              [enable PDT extensions])],
+              [],
+              [enable_pdt=no])
 AM_CONDITIONAL([HAVE_PDT], [test "x$enable_pdt" != xno])
+
+AC_ARG_ENABLE([python], 
+              [AS_HELP_STRING([--enable-python], 
+              [enable Python extensions])],
+              [],
+              [enable_python=no])
+AM_CONDITIONAL([HAVE_PYTHON], [test "x$enable_python" != xno])
+if test "x$enable_python" != xno; then
+  AM_PATH_PYTHON(2.7)
+  AC_PYTHON_DEVEL([>= '2.7'])
+fi
 
 AC_SUBST([libfstdir], [${libdir}/fst])
 

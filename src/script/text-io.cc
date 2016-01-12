@@ -32,7 +32,7 @@ bool ReadPotentials(const string &weight_type,
                     const string& filename,
                     vector<WeightClass>* potential) {
   ifstream strm(filename.c_str());
-  if (!strm) {
+  if (!strm.good()) {
     LOG(ERROR) << "ReadPotentials: Can't open file: " << filename;
     return false;
   }
@@ -42,7 +42,7 @@ bool ReadPotentials(const string &weight_type,
   size_t nline = 0;
 
   potential->clear();
-  while (strm.getline(line, kLineLen)) {
+  while (!strm.getline(line, kLineLen).fail()) {
     ++nline;
     vector<char *> col;
     SplitToVector(line, "\n\t ", &col, true);
@@ -67,10 +67,10 @@ bool ReadPotentials(const string &weight_type,
 // Writes vector of weights; returns true on success.
 bool WritePotentials(const string& filename,
                      const vector<WeightClass>& potential) {
-  ostream *strm = &cout;
+  ostream* strm = &std::cout;
   if (!filename.empty()) {
     strm = new ofstream(filename.c_str());
-    if (!*strm) {
+    if (!strm->good()) {
       LOG(ERROR) << "WritePotentials: Can't open file: " << filename;
       delete strm;
       return false;
@@ -81,12 +81,11 @@ bool WritePotentials(const string& filename,
   for (ssize_t s = 0; s < potential.size(); ++s)
     *strm << s << "\t" << potential[s] << "\n";
 
-  if (!*strm)
+  if (strm->fail())
     LOG(ERROR) << "WritePotentials: Write failed: "
                << (filename.empty() ? "standard output" : filename);
-  bool ret = *strm;
-  if (strm != &cout)
-    delete strm;
+  bool ret = !strm->fail();
+  if (strm != &std::cout) delete strm;
   return ret;
 }
 

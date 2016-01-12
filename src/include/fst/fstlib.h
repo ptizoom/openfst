@@ -65,6 +65,7 @@
 #include <fst/connect.h>
 #include <fst/determinize.h>
 #include <fst/difference.h>
+#include <fst/disambiguate.h>
 #include <fst/encode.h>
 #include <fst/epsnormalize.h>
 #include <fst/equal.h>
@@ -72,6 +73,7 @@
 #include <fst/factor-weight.h>
 #include <fst/intersect.h>
 #include <fst/invert.h>
+#include <fst/isomorphic.h>
 #include <fst/map.h>
 #include <fst/minimize.h>
 #include <fst/project.h>

@@ -24,9 +24,9 @@
 #include <algorithm>
 #include <deque>
 using std::deque;
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 #include <utility>
 using std::pair; using std::make_pair;
 #include <vector>
@@ -119,7 +119,7 @@ typename EquivalenceUtil<Arc>::MappedId EquivalenceUtil<Arc>::kInvalidId;
 // forest (the union-find algorithm) is used to represent the sets of
 // states. The algorithm returns 'false' if one of the constructed
 // sets contains both final and non-final states. Returns optional error
-// value (when FLAGS_error_fatal = false).
+// value (useful when FLAGS_error_fatal = false).
 //
 // Complexity: quasi-linear, i.e. O(n G(n)), where
 //   n = |S1| + |S2| is the number of states in both acceptors
@@ -209,7 +209,7 @@ bool Equivalent(const Fst<Arc> &fst1,
   // updating the equivalence relation on the statesets. Loop
   // invariant: each block of states contains either final states only
   // or non-final states only.
-  for (q.push_back(make_pair(s1, s2)); ret && !q.empty(); q.pop_front()) {
+  for (q.push_back(std::make_pair(s1, s2)); ret && !q.empty(); q.pop_front()) {
     s1 = q.front().first;
     s2 = q.front().second;
 

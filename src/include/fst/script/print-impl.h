@@ -47,10 +47,13 @@ template <class A> class FstPrinter {
              const SymbolTable *osyms,
              const SymbolTable *ssyms,
              bool accep,
-             bool show_weight_one)
+             bool show_weight_one,
+             const string &field_separator,
+             const string &missing_symbol = "")
       : fst_(fst), isyms_(isyms), osyms_(osyms), ssyms_(ssyms),
         accep_(accep && fst.Properties(kAcceptor, true)), ostrm_(0),
-        show_weight_one_(show_weight_one) {}
+        show_weight_one_(show_weight_one), sep_(field_separator),
+        missing_symbol_(missing_symbol) {}
 
   // Print Fst to an output stream
   void Print(ostream *ostrm, const string &dest) {
@@ -79,11 +82,15 @@ template <class A> class FstPrinter {
     if (syms) {
       string symbol = syms->Find(id);
       if (symbol == "") {
-        FSTERROR() << "FstPrinter: Integer " << id
-                   << " is not mapped to any textual symbol"
-                   << ", symbol table = " << syms->Name()
-                   << ", destination = " << dest_;
-        symbol = "?";
+        if (missing_symbol_ == "") {
+          FSTERROR() << "FstPrinter: Integer " << id
+                     << " is not mapped to any textual symbol"
+                     << ", symbol table = " << syms->Name()
+                     << ", destination = " << dest_;
+          symbol = "?";
+        } else {
+          symbol = missing_symbol_;
+        }
       }
       *ostrm_ << symbol;
     } else {
@@ -110,16 +117,16 @@ template <class A> class FstPrinter {
          aiter.Next()) {
       Arc arc = aiter.Value();
       PrintStateId(s);
-      *ostrm_ << FLAGS_fst_field_separator[0];
+      *ostrm_ << sep_;
       PrintStateId(arc.nextstate);
-      *ostrm_ << FLAGS_fst_field_separator[0];
+      *ostrm_ << sep_;
       PrintILabel(arc.ilabel);
       if (!accep_) {
-        *ostrm_ << FLAGS_fst_field_separator[0];
+        *ostrm_ << sep_;
         PrintOLabel(arc.olabel);
       }
       if (show_weight_one_ || arc.weight != Weight::One())
-        *ostrm_ << FLAGS_fst_field_separator[0] << arc.weight;
+        *ostrm_ << sep_ << arc.weight;
       *ostrm_ << "\n";
       output = true;
     }
@@ -127,7 +134,7 @@ template <class A> class FstPrinter {
     if (final != Weight::Zero() || !output) {
       PrintStateId(s);
       if (show_weight_one_ || final != Weight::One()) {
-        *ostrm_ << FLAGS_fst_field_separator[0] << final;
+        *ostrm_ << sep_ << final;
       }
       *ostrm_ << "\n";
     }
@@ -141,6 +148,9 @@ template <class A> class FstPrinter {
   ostream *ostrm_;               // text FST destination
   string dest_;                  // text FST destination name
   bool show_weight_one_;         // print weights equal to Weight::One()
+  string sep_;                   // separator character between fields.
+  string missing_symbol_;        // symbol to print when lookup fails (default
+                                 // "" means raise error)
   DISALLOW_COPY_AND_ASSIGN(FstPrinter);
 };
 

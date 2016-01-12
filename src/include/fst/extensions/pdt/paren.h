@@ -23,12 +23,12 @@
 #define FST_EXTENSIONS_PDT_PAREN_H_
 
 #include <algorithm>
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
-#include <tr1/unordered_set>
-using std::tr1::unordered_set;
-using std::tr1::unordered_multiset;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
+#include <unordered_set>
+using std::unordered_set;
+using std::unordered_multiset;
 #include <set>
 
 #include <fst/extensions/pdt/pdt.h>
@@ -301,7 +301,7 @@ void PdtParenReachable<A>::ComputeStateSet(StateId s) {
         paren_set.insert(paren_id);
         state_sets[paren_id].insert(s);
         ParenState<A> paren_state(paren_id, s);
-        paren_arc_multimap_.insert(make_pair(paren_state, arc));
+        paren_arc_multimap_.insert(std::make_pair(paren_state, arc));
       }
     } else {                                        // non-paren
       UpdateStateSet(arc.nextstate, &paren_set, &state_sets);
@@ -313,7 +313,7 @@ void PdtParenReachable<A>::ComputeStateSet(StateId s) {
        paren_iter != paren_set.end(); ++paren_iter) {
     state_set.clear();
     Label paren_id = *paren_iter;
-    paren_multimap_.insert(make_pair(s, paren_id));
+    paren_multimap_.insert(std::make_pair(s, paren_id));
     for (typename set<StateId>::iterator state_iter
              = state_sets[paren_id].begin();
          state_iter != state_sets[paren_id].end();
@@ -378,7 +378,7 @@ class PdtBalanceData {
     ParenState<A> key(paren_id, open_dest);
     if (!open_paren_set_.count(key)) {
       open_paren_set_.insert(key);
-      open_paren_map_.insert(make_pair(open_dest, paren_id));
+      open_paren_map_.insert(std::make_pair(open_dest, paren_id));
     }
   }
 
@@ -389,7 +389,7 @@ class PdtBalanceData {
   void CloseInsert(Label paren_id, StateId open_dest, StateId close_source) {
     ParenState<A> key(paren_id, open_dest);
     if (open_paren_set_.count(key))
-      close_paren_map_.insert(make_pair(key, close_source));
+      close_paren_map_.insert(std::make_pair(key, close_source));
   }
 
   // Find close paren source states matching an open parenthesis.
@@ -423,9 +423,9 @@ class PdtBalanceData {
         close_sources.push_back(cit->second);
         close_paren_map_.erase(cit++);
       }
-      sort(close_sources.begin(), close_sources.end());
+      std::sort(close_sources.begin(), close_sources.end());
       typename vector<StateId>::iterator unique_end =
-          unique(close_sources.begin(), close_sources.end());
+          std::unique(close_sources.begin(), close_sources.end());
       close_sources.resize(unique_end - close_sources.begin());
 
       if (!close_sources.empty())

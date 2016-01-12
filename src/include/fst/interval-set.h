@@ -18,8 +18,8 @@
 // \file
 // Class to represent and operate on sets of intervals.
 
-#ifndef FST_LIB_INTERVAL_SET_H__
-#define FST_LIB_INTERVAL_SET_H__
+#ifndef FST_LIB_INTERVAL_SET_H_
+#define FST_LIB_INTERVAL_SET_H_
 
 #include <iostream>
 #include <vector>
@@ -105,7 +105,7 @@ class IntervalSet {
   bool Member(T value) const {
     Interval interval(value, value);
     typename vector<Interval>::const_iterator lb =
-        lower_bound(intervals_.begin(), intervals_.end(), interval);
+        std::lower_bound(intervals_.begin(), intervals_.end(), interval);
     if (lb == intervals_.begin())
       return false;
     return (--lb)->end > value;
@@ -172,7 +172,7 @@ class IntervalSet {
 // Sorts; collapses overlapping and adjacent interavls; sets count.
 template <typename T>
 void IntervalSet<T>::Normalize() {
-  sort(intervals_.begin(), intervals_.end());
+  std::sort(intervals_.begin(), intervals_.end());
 
   count_ = 0;
   T size = 0;
@@ -218,7 +218,7 @@ void IntervalSet<T>::Intersect(const IntervalSet<T> &iset,
       interval.end = min(it1->end, it2->end);
       ointervals->push_back(interval);
       oset->count_ += interval.end - interval.begin;
-      if (it1->end < it2->end)
+      if ((it1->end) < (it2->end))
         ++it1;
       else
         ++it2;
@@ -240,14 +240,14 @@ void IntervalSet<T>::Complement(T maxval, IntervalSet<T> *oset) const {
        it != intervals_.end();
        ++it) {
     interval.end = min(it->begin, maxval);
-    if (interval.begin < interval.end) {
+    if ((interval.begin) < (interval.end)) {
       ointervals->push_back(interval);
       oset->count_ += interval.end - interval.begin;
     }
     interval.begin = it->end;
   }
   interval.end = maxval;
-  if (interval.begin < interval.end) {
+  if ((interval.begin) < (interval.end)) {
     ointervals->push_back(interval);
     oset->count_ += interval.end - interval.begin;
   }
@@ -346,9 +346,10 @@ bool IntervalSet<T>::Contains(const IntervalSet<T> &iset) const {
   typename vector<Interval>::const_iterator it2 = intervals->begin();
 
   while (it1 != intervals_.end() && it2 != intervals->end()) {
-    if (it1->end <= it2->begin) {  // no overlap - it1 first
+    if ((it1->end) <= (it2->begin)) {  // no overlap - it1 first
       ++it1;
-    } else if (it2->begin < it1->begin || it2->end > it1->end) {  // no C
+    } else if ((it2->begin) < (it1->begin) ||
+               (it2->end) > (it1->end)) {  // no C
       return false;
     } else if (it2->end == it1->end) {
       ++it1;
@@ -378,4 +379,4 @@ ostream &operator<<(ostream &strm, const IntervalSet<T> &s)  {
 
 }  // namespace fst
 
-#endif  // FST_LIB_INTERVAL_SET_H__
+#endif  // FST_LIB_INTERVAL_SET_H_

@@ -25,12 +25,12 @@
 #include <fst/extensions/pdt/paren.h>
 #include <fst/extensions/pdt/pdt.h>
 
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
-#include <tr1/unordered_set>
-using std::tr1::unordered_set;
-using std::tr1::unordered_multiset;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
+#include <unordered_set>
+using std::unordered_set;
+using std::unordered_multiset;
 #include <stack>
 #include <vector>
 using std::vector;
@@ -255,8 +255,7 @@ class PdtShortestPathData {
       state_data_ = &search_map_[s];
       if (!(state_data_->flags & kInited)) {
         ++nstates_;
-        if (gc_)
-          search_multimap_.insert(make_pair(s.start, s.state));
+        if (gc_) search_multimap_.insert(std::make_pair(s.start, s.state));
         state_data_->flags = kInited;
       }
       return state_data_;
@@ -412,7 +411,7 @@ class PdtShortestPath {
       paren_id_map_[p.first] = i;
       paren_id_map_[p.second] = i;
     }
-  };
+  }
 
   ~PdtShortestPath() {
     VLOG(1) << "# of input states: " << CountStates(*ifst_);
@@ -514,7 +513,7 @@ void PdtShortestPath<Arc, Queue>::Init(MutableFst<Arc> *ofst) {
           balance_data_.OpenInsert(paren_id, arc.nextstate);
         } else {                                      // Close paren
           ParenState<Arc> paren_state(paren_id, s);
-          close_paren_multimap_.insert(make_pair(paren_state, arc));
+          close_paren_multimap_.insert(std::make_pair(paren_state, arc));
         }
       }
     }

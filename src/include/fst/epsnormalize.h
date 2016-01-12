@@ -21,9 +21,9 @@
 #ifndef FST_LIB_EPSNORMALIZE_H__
 #define FST_LIB_EPSNORMALIZE_H__
 
-#include <tr1/unordered_map>
-using std::tr1::unordered_map;
-using std::tr1::unordered_multimap;
+#include <unordered_map>
+using std::unordered_map;
+using std::unordered_multimap;
 
 
 #include <fst/factor-weight.h>
@@ -42,27 +42,32 @@ enum EpsNormalizeType {EPS_NORM_INPUT, EPS_NORM_OUTPUT};
 // label follows all non-epsilon input labels. Output epsilon-normalized
 // is defined similarly.
 //
-// The input FST needs to be functional.
-//
 // References:
 // - Mehryar Mohri. "Generic epsilon-removal and input epsilon-normalization
 //   algorithms for weighted transducers", International Journal of Computer
 //   Science, 13(1): 129-143, 2002.
 template <class Arc>
 void EpsNormalize(const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
-                      EpsNormalizeType type = EPS_NORM_INPUT) {
-  VectorFst< GallicArc<Arc, STRING_RIGHT_RESTRICT> > gfst;
+                  EpsNormalizeType type = EPS_NORM_INPUT) {
+  EpsNormalize<Arc, GALLIC>(ifst, ofst, type);
+}
+
+// Same as above, expect allows specifying explicitely the gallic weight type.
+template <class Arc, GallicType G>
+void EpsNormalize(const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
+                  EpsNormalizeType type) {
+  VectorFst< GallicArc<Arc, G> > gfst;
   if (type == EPS_NORM_INPUT)
-    ArcMap(ifst, &gfst, ToGallicMapper<Arc, STRING_RIGHT_RESTRICT>());
-  else // type == EPS_NORM_OUTPUT
+    ArcMap(ifst, &gfst, ToGallicMapper<Arc, G>());
+  else  // type == EPS_NORM_OUTPUT
     ArcMap(InvertFst<Arc>(ifst), &gfst,
-           ToGallicMapper<Arc, STRING_RIGHT_RESTRICT>());
+           ToGallicMapper<Arc, G>());
   RmEpsilon(&gfst);
-  FactorWeightFst< GallicArc<Arc, STRING_RIGHT_RESTRICT>,
+  FactorWeightFst< GallicArc<Arc, G>,
     GallicFactor<typename Arc::Label,
-      typename Arc::Weight, STRING_RIGHT_RESTRICT> >
+      typename Arc::Weight, G> >
     fwfst(gfst);
-  ArcMap(fwfst, ofst, FromGallicMapper<Arc, STRING_RIGHT_RESTRICT>());
+  ArcMap(fwfst, ofst, FromGallicMapper<Arc, G>());
   ofst->SetOutputSymbols(ifst.OutputSymbols());
   if(type == EPS_NORM_OUTPUT)
     Invert(ofst);

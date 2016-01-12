@@ -21,6 +21,8 @@
 #include <fst/script/fst-class.h>
 #include <fst/script/print-impl.h>
 
+DECLARE_string(fst_field_separator);
+
 namespace fst {
 namespace script {
 
@@ -37,6 +39,8 @@ struct FstPrinterArgs {
   const bool show_weight_one;
   ostream *ostrm;
   const string &dest;
+  const string &sep;  // NOLINT
+  const string &missing_symbol;
 
   FstPrinterArgs(const FstClass &fst,
                  const SymbolTable *isyms,
@@ -45,9 +49,12 @@ struct FstPrinterArgs {
                  bool accept,
                  bool show_weight_one,
                  ostream *ostrm,
-                 const string &dest) :
+                 const string &dest,
+                 const string &sep,
+                 const string &missing_sym = "") :
       fst(fst), isyms(isyms), osyms(osyms), ssyms(ssyms), accept(accept),
-      show_weight_one(show_weight_one), ostrm(ostrm), dest(dest) { }
+      show_weight_one(show_weight_one), ostrm(ostrm), dest(dest), sep(sep),
+      missing_symbol(missing_sym) { }
 };
 
 template<class Arc>
@@ -56,7 +63,9 @@ void PrintFst(FstPrinterArgs *args) {
 
   fst::FstPrinter<Arc> fstprinter(fst, args->isyms, args->osyms,
                                       args->ssyms, args->accept,
-                                      args->show_weight_one);
+                                      args->show_weight_one,
+                                      args->sep,
+                                      args->missing_symbol);
   fstprinter.Print(args->ostrm, args->dest);
 }
 
@@ -64,7 +73,8 @@ void PrintFst(const FstClass &fst, ostream &ostrm, const string &dest,
               const SymbolTable *isyms,
               const SymbolTable *osyms,
               const SymbolTable *ssyms,
-              bool accept, bool show_weight_one);
+              bool accept, bool show_weight_one,
+              const string &missing_sym = "");
 
 
 // Below are two printing methods with useful defaults for a few of
@@ -74,7 +84,9 @@ void PrintFst(const Fst<Arc> &fst, ostream &os, const string dest = "",
               const SymbolTable *isyms = NULL,
               const SymbolTable *osyms = NULL,
               const SymbolTable *ssyms = NULL) {
-  fst::FstPrinter<Arc> fstprinter(fst, isyms, osyms, ssyms, true, true);
+  string sep = FLAGS_fst_field_separator.substr(0, 1);
+  fst::FstPrinter<Arc> fstprinter(fst, isyms, osyms, ssyms, true, true,
+                                      sep);
   fstprinter.Print(&os, dest);
 }
 
