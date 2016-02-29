@@ -127,12 +127,14 @@ if test "x$enable_python" != xno; then
   AM_PATH_PYTHON(2.7)
   AC_PYTHON_DEVEL([>= '2.7'])
 fi
-AM_CONDITIONAL([HAVE_FAR], [test "x$enable_python" != xno])
 
 AC_ARG_WITH([libfstdir],
 [--with-libfstdir[=DIR] fst dynamic extensions [[LIBDIR/fst]]],
 [], [with_libfstdir=[${libdir}/fst]])
 
 AC_SUBST([libfstdir], $with_libfstdir)
+
+AC_CHECK_LIB([dl], dlopen, [DL_LIBS=-ldl])
+AC_SUBST([DL_LIBS])
 
 AC_OUTPUT

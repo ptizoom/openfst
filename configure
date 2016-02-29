@@ -636,6 +636,7 @@ ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
 LIBOBJS
+DL_LIBS
 libfstdir
 PYTHON_EXTRA_LDFLAGS
 PYTHON_EXTRA_LIBS
@@ -16061,14 +16062,6 @@ ac_compiler_gnu=$ac_cv_cxx_compiler_gnu
 	#
 
 fi
- if test "x$enable_python" != xno; then
-  HAVE_FAR_TRUE=
-  HAVE_FAR_FALSE='#'
-else
-  HAVE_FAR_TRUE='#'
-  HAVE_FAR_FALSE=
-fi
-
 
 
 # Check whether --with-libfstdir was given.
@@ -16080,6 +16073,48 @@ fi
 
 
 libfstdir=$with_libfstdir
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+$as_echo_n "checking for dlopen in -ldl... " >&6; }
+if ${ac_cv_lib_dl_dlopen+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_cxx_try_link "$LINENO"; then :
+  ac_cv_lib_dl_dlopen=yes
+else
+  ac_cv_lib_dl_dlopen=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
+$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
+if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
+  DL_LIBS=-ldl
+fi
+
 
 
 cat >confcache <<\_ACEOF
@@ -16265,10 +16300,6 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${HAVE_PYTHON_TRUE}" && test -z "${HAVE_PYTHON_FALSE}"; then
   as_fn_error $? "conditional \"HAVE_PYTHON\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${HAVE_FAR_TRUE}" && test -z "${HAVE_FAR_FALSE}"; then
-  as_fn_error $? "conditional \"HAVE_FAR\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

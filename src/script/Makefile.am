@@ -1,4 +1,5 @@
 AM_CPPFLAGS = -I$(srcdir)/../include $(ICU_CPPFLAGS)
+LDADD = $(DL_LIBS)
 
 if HAVE_SCRIPT
 lib_LTLIBRARIES = libfstscript.la
@@ -12,5 +13,6 @@ relabel.cc replace.cc reverse.cc reweight.cc rmepsilon.cc script-impl.cc \
 shortest-distance.cc shortest-path.cc stateiterator-class.cc synchronize.cc \
 text-io.cc topsort.cc union.cc weight-class.cc verify.cc
 
+libfstscript_la_LIBADD = ../lib/libfst.la
 libfstscript_la_LDFLAGS = -version-info 2:5:0
 endif

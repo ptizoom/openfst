@@ -1,4 +1,5 @@
 AM_CPPFLAGS = -I$(srcdir)/../include $(ICU_CPPFLAGS)
+LDADD = $(DL_LIBS)
 
 lib_LTLIBRARIES = libfst.la
 libfst_la_SOURCES = compat.cc flags.cc fst.cc properties.cc \
