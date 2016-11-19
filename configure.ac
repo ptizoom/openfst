@@ -1,5 +1,6 @@
 AC_INIT([OpenFst], [1.6.3], [help@www.openfst.org])
 AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror subdir-objects])
+AM_MAINTAINER_MODE
 AM_PROG_AR
 
 # OpenFst does not throw exceptions, so we do not generate exception handling
