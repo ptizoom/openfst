@@ -5,12 +5,16 @@
 
 #include "./fst_test.h"
 
+#include <utility>
+
+#include <fst/log.h>
 #include <fst/compact-fst.h>
 #include <fst/const-fst.h>
 #include <fst/edit-fst.h>
 #include <fst/matcher-fst.h>
 
 namespace fst {
+namespace {
 
 // A user-defined arc type.
 struct CustomArc {
@@ -19,7 +23,7 @@ struct CustomArc {
   typedef int64 StateId;
 
   CustomArc(Label i, Label o, Weight w, StateId s)
-      : ilabel(i), olabel(o), weight(w), nextstate(s) {}
+      : ilabel(i), olabel(o), weight(std::move(w)), nextstate(s) {}
   CustomArc() {}
 
   static const string &Type() {  // Arc type name
@@ -72,10 +76,9 @@ class CustomCompactor {
 
 REGISTER_FST(VectorFst, CustomArc);
 REGISTER_FST(ConstFst, CustomArc);
-static fst::FstRegisterer<CompactFst<StdArc, CustomCompactor<StdArc>> >
+static fst::FstRegisterer<CompactFst<StdArc, CustomCompactor<StdArc>>>
     CompactFst_StdArc_CustomCompactor_registerer;
-static fst::FstRegisterer<
-    CompactFst<CustomArc, CustomCompactor<CustomArc>> >
+static fst::FstRegisterer<CompactFst<CustomArc, CustomCompactor<CustomArc>>>
     CompactFst_CustomArc_CustomCompactor_registerer;
 static fst::FstRegisterer<ConstFst<StdArc, uint16>>
     ConstFst_StdArc_uint16_registerer;
@@ -83,6 +86,7 @@ static fst::FstRegisterer<
     CompactFst<StdArc, CustomCompactor<StdArc>, uint16>>
     CompactFst_StdArc_CustomCompactor_uint16_registerer;
 
+}  // namespace
 }  // namespace fst
 
 using fst::FstTester;
@@ -124,7 +128,7 @@ int main(int argc, char **argv) {
 
   // CompactFst<StdArc, CustomCompactor<StdArc>>
   {
-    FstTester<CompactFst<StdArc, CustomCompactor<StdArc>> > std_compact_tester;
+    FstTester<CompactFst<StdArc, CustomCompactor<StdArc>>> std_compact_tester;
     std_compact_tester.TestBase();
     std_compact_tester.TestExpanded();
     std_compact_tester.TestCopy();
@@ -153,7 +157,7 @@ int main(int argc, char **argv) {
 
   // CompactFst<CustomArc, CustomCompactor<CustomArc>>
   {
-    FstTester<CompactFst<CustomArc, CustomCompactor<CustomArc>> >
+    FstTester<CompactFst<CustomArc, CustomCompactor<CustomArc>>>
         std_compact_tester;
     std_compact_tester.TestBase();
     std_compact_tester.TestExpanded();

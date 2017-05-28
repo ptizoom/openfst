@@ -3,8 +3,12 @@
 //
 // Minimizes a deterministic FST.
 
-#include <memory>
+#include <cstring>
 
+#include <memory>
+#include <string>
+
+#include <fst/log.h>
 #include <fst/script/minimize.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
@@ -12,7 +16,6 @@ DEFINE_bool(allow_nondet, false, "Minimize non-deterministic FSTs");
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
-  using fst::script::FstClass;
   using fst::script::MutableFstClass;
   using fst::script::VectorFstClass;
 
@@ -27,9 +30,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
-  string out1_name = (argc > 2 && strcmp(argv[2], "-") != 0) ? argv[2] : "";
-  string out2_name = (argc > 3 && strcmp(argv[3], "-") != 0) ? argv[3] : "";
+  const string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
+  const string out1_name =
+      (argc > 2 && strcmp(argv[2], "-") != 0) ? argv[2] : "";
+  const string out2_name =
+      (argc > 3 && strcmp(argv[3], "-") != 0) ? argv[3] : "";
 
   if (out1_name.empty() && out2_name.empty() && argc > 3) {
     LOG(ERROR) << argv[0] << ": Both outputs can't be standard output.";

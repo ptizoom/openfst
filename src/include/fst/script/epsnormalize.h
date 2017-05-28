@@ -11,14 +11,13 @@
 namespace fst {
 namespace script {
 
-typedef args::Package<const FstClass &, MutableFstClass *, EpsNormalizeType>
-    EpsNormalizeArgs;
+using EpsNormalizeArgs =
+    args::Package<const FstClass &, MutableFstClass *, EpsNormalizeType>;
 
 template <class Arc>
 void EpsNormalize(EpsNormalizeArgs *args) {
   const Fst<Arc> &ifst = *(args->arg1.GetFst<Arc>());
   MutableFst<Arc> *ofst = args->arg2->GetMutableFst<Arc>();
-
   EpsNormalize(ifst, ofst, args->arg3);
 }
 

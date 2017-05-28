@@ -7,6 +7,7 @@
 #define FST_LIB_UTIL_H_
 
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <map>
 #include <set>
@@ -20,12 +21,11 @@
 
 #include <fst/compat.h>
 #include <fst/types.h>
+#include <fst/log.h>
 #include <fstream>
 
 
-//
-// UTILITY FOR ERROR HANDLING
-//
+// Utility for error handling.
 
 DECLARE_bool(fst_error_fatal);
 
@@ -34,11 +34,9 @@ DECLARE_bool(fst_error_fatal);
 
 namespace fst {
 
-//
-// UTILITIES FOR TYPE I/O
-//
+// Utility for type I/O.
 
-// Read some types from an input stream.
+// Reads types from an input stream.
 
 // Generic case.
 template <class T,
@@ -59,7 +57,7 @@ inline std::istream &ReadType(std::istream &strm, string *s) {  // NOLINT
   s->clear();
   int32 ns = 0;
   strm.read(reinterpret_cast<char *>(&ns), sizeof(ns));
-  for (auto i = 0; i < ns; ++i) {
+  for (int32 i = 0; i < ns; ++i) {
     char c;
     strm.read(&c, 1);
     *s += c;
@@ -67,23 +65,19 @@ inline std::istream &ReadType(std::istream &strm, string *s) {  // NOLINT
   return strm;
 }
 
-// Declares some types that write to an output stream.
-
-#define DECL_READ_TYPE2(C)          \
-  template <typename S, typename T> \
-  inline std::istream &ReadType(std::istream &strm, C<S, T> *c)  // NOLINT
-
-#define DECL_READ_TYPE3(C)                      \
-  template <typename S, typename T, typename U> \
-  inline std::istream &ReadType(std::istream &strm, C<S, T, U> *c)
-
-DECL_READ_TYPE2(std::vector);
-DECL_READ_TYPE2(std::list);
-
-DECL_READ_TYPE3(std::set);
-DECL_READ_TYPE3(std::unordered_set);
-DECL_READ_TYPE3(std::map);
-DECL_READ_TYPE3(std::unordered_map);
+// Declares types that can be read from an input stream.
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::vector<T...> *c);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::list<T...> *c);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::set<T...> *c);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::map<T...> *c);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::unordered_map<T...> *c);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::unordered_set<T...> *c);
 
 // Pair case.
 template <typename S, typename T>
@@ -100,56 +94,57 @@ inline std::istream &ReadType(std::istream &strm, std::pair<const S, T> *p) {
   return strm;
 }
 
-// General case - no-op.
-template <typename C>
-void StlReserve(C *c, int64 n) {}
+namespace internal {
+template <class C, class ReserveFn>
+std::istream &ReadContainerType(std::istream &strm, C *c, ReserveFn reserve) {
+  c->clear();
+  int64 n = 0;
+  ReadType(strm, &n);
+  reserve(c, n);
+  auto insert = std::inserter(*c, c->begin());
+  for (int64 i = 0; i < n; ++i) {
+    typename C::value_type value;
+    ReadType(strm, &value);
+    *insert = value;
+  }
+  return strm;
+}
+}  // namespace internal
 
-// Specialization for vectors.
-template <typename S, typename T>
-void StlReserve(std::vector<S, T> *c, int64 n) {
-  c->reserve(n);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::vector<T...> *c) {
+  return internal::ReadContainerType(
+      strm, c, [](decltype(c) v, int n) { v->reserve(n); });
 }
 
-// STL sequence container.
-#define READ_STL_SEQ_TYPE(C)                                      \
-  template <typename S, typename T>                               \
-  inline std::istream &ReadType(std::istream &strm, C<S, T> *c) { \
-    c->clear();                                                   \
-    int64 n = 0;                                                  \
-    strm.read(reinterpret_cast<char *>(&n), sizeof(n));           \
-    StlReserve(c, n);                                             \
-    for (ssize_t i = 0; i < n; ++i) {                             \
-      typename C<S, T>::value_type value;                         \
-      ReadType(strm, &value);                                     \
-      c->insert(c->end(), value);                                 \
-    }                                                             \
-    return strm;                                                  \
-  }
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::list<T...> *c) {
+  return internal::ReadContainerType(strm, c, [](decltype(c) v, int n) {});
+}
 
-READ_STL_SEQ_TYPE(vector);
-READ_STL_SEQ_TYPE(list);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::set<T...> *c) {
+  return internal::ReadContainerType(strm, c, [](decltype(c) v, int n) {});
+}
 
-// STL associative container.
-#define READ_STL_ASSOC_TYPE(C)                                       \
-  template <typename S, typename T, typename U>                      \
-  inline std::istream &ReadType(std::istream &strm, C<S, T, U> *c) { \
-    c->clear();                                                      \
-    int64 n = 0;                                                     \
-    strm.read(reinterpret_cast<char *>(&n), sizeof(n));              \
-    for (ssize_t i = 0; i < n; ++i) {                                \
-      typename C<S, T, U>::value_type value;                         \
-      ReadType(strm, &value);                                        \
-      c->insert(value);                                              \
-    }                                                                \
-    return strm;                                                     \
-  }
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::map<T...> *c) {
+  return internal::ReadContainerType(strm, c, [](decltype(c) v, int n) {});
+}
 
-READ_STL_ASSOC_TYPE(std::set);
-READ_STL_ASSOC_TYPE(std::unordered_set);
-READ_STL_ASSOC_TYPE(std::map);
-READ_STL_ASSOC_TYPE(std::unordered_map);
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::unordered_set<T...> *c) {
+  return internal::ReadContainerType(
+      strm, c, [](decltype(c) v, int n) { v->reserve(n); });
+}
 
-// Write some types to an output stream.
+template <class... T>
+std::istream &ReadType(std::istream &strm, std::unordered_map<T...> *c) {
+  return internal::ReadContainerType(
+      strm, c, [](decltype(c) v, int n) { v->reserve(n); });
+}
+
+// Writes types to an output stream.
 
 // Generic case.
 template <class T,
@@ -173,24 +168,20 @@ inline std::ostream &WriteType(std::ostream &strm, const string &s) {  // NOLINT
   return strm.write(s.data(), ns);
 }
 
-// Declares some types that write to an output stream.
+// Declares types that can be written to an output stream.
 
-#define DECL_WRITE_TYPE2(C)         \
-  template <typename S, typename T> \
-  inline std::ostream &WriteType(std::ostream &strm, const C<S, T> &c)
-
-#define DECL_WRITE_TYPE3(C)                          \
-  template <typename S, typename T, typename U>      \
-  inline std::ostream &WriteType(std::ostream &strm, \
-                                 const C<S, T, U> &c)  // NOLINT
-
-DECL_WRITE_TYPE2(std::vector);
-DECL_WRITE_TYPE2(std::list);
-
-DECL_WRITE_TYPE3(std::set);
-DECL_WRITE_TYPE3(std::unordered_set);
-DECL_WRITE_TYPE3(std::map);
-DECL_WRITE_TYPE3(std::unordered_map);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::vector<T...> &c);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::list<T...> &c);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::set<T...> &c);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::map<T...> &c);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::unordered_map<T...> &c);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::unordered_set<T...> &c);
 
 // Pair case.
 template <typename S, typename T>
@@ -201,41 +192,52 @@ inline std::ostream &WriteType(std::ostream &strm,
   return strm;
 }
 
-// STL sequence container.
-#define WRITE_STL_SEQ_TYPE(C)                                                  \
-  template <typename S, typename T>                                            \
-  inline std::ostream &WriteType(std::ostream &strm, const C<S, T> &c) {       \
-    int64 n = c.size();                                                        \
-    strm.write(reinterpret_cast<char *>(&n), sizeof(n));                       \
-    for (typename C<S, T>::const_iterator it = c.begin(); it != c.end(); ++it) \
-      WriteType(strm, *it);                                                    \
-    return strm;                                                               \
+namespace internal {
+template <class C>
+std::ostream &WriteContainer(std::ostream &strm, const C &c) {
+  const int64 n = c.size();
+  WriteType(strm, n);
+  for (const auto &e : c) {
+    WriteType(strm, e);
   }
+  return strm;
+}
+}  // namespace internal
 
-WRITE_STL_SEQ_TYPE(vector);
-WRITE_STL_SEQ_TYPE(list);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::vector<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
 
-// STL associative container.
-#define WRITE_STL_ASSOC_TYPE(C)                                             \
-  template <typename S, typename T, typename U>                             \
-  inline std::ostream &WriteType(std::ostream &strm, const C<S, T, U> &c) { \
-    int64 n = c.size();                                                     \
-    strm.write(reinterpret_cast<char *>(&n), sizeof(n));                    \
-    for (typename C<S, T, U>::const_iterator it = c.begin(); it != c.end(); \
-         ++it)                                                              \
-      WriteType(strm, *it);                                                 \
-    return strm;                                                            \
-  }
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::list<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
 
-WRITE_STL_ASSOC_TYPE(std::set);
-WRITE_STL_ASSOC_TYPE(std::unordered_set);
-WRITE_STL_ASSOC_TYPE(std::map);
-WRITE_STL_ASSOC_TYPE(std::unordered_map);
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::set<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
+
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::map<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
+
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::unordered_map<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
+
+template <typename... T>
+std::ostream &WriteType(std::ostream &strm, const std::unordered_set<T...> &c) {
+  return internal::WriteContainer(strm, c);
+}
 
 // Utilities for converting between int64 or Weight and string.
 
 int64 StrToInt64(const string &s, const string &src, size_t nline,
-                 bool allow_negative, bool *error = 0);
+                 bool allow_negative, bool *error = nullptr);
 
 template <typename Weight>
 Weight StrToWeight(const string &s, const string &src, size_t nline) {
@@ -262,12 +264,10 @@ void WeightToStr(Weight w, string *s) {
 
 // Utilities for reading/writing integer pairs (typically labels)
 
-// Modifies line, vec consists of pointers to of buffer beginning
-// with line.
+// Modifies line using a vector of pointers to a buffer beginning with line.
 void SplitToVector(char *line, const char *delim, std::vector<char *> *vec,
                    bool omit_empty_strings);
 
-// Returns true on success
 template <typename I>
 bool ReadIntPairs(const string &filename, std::vector<std::pair<I, I>> *pairs,
                   bool allow_negative = false) {
@@ -276,24 +276,21 @@ bool ReadIntPairs(const string &filename, std::vector<std::pair<I, I>> *pairs,
     LOG(ERROR) << "ReadIntPairs: Can't open file: " << filename;
     return false;
   }
-
   const int kLineLen = 8096;
   char line[kLineLen];
   size_t nline = 0;
-
   pairs->clear();
   while (strm.getline(line, kLineLen)) {
     ++nline;
     std::vector<char *> col;
     SplitToVector(line, "\n\t ", &col, true);
     // empty line or comment?
-    if (col.size() == 0 || col[0][0] == '\0' || col[0][0] == '#') continue;
+    if (col.empty() || col[0][0] == '\0' || col[0][0] == '#') continue;
     if (col.size() != 2) {
       LOG(ERROR) << "ReadIntPairs: Bad number of columns, "
                  << "file = " << filename << ", line = " << nline;
       return false;
     }
-
     bool err;
     I i1 = StrToInt64(col[0], filename, nline, allow_negative, &err);
     if (err) return false;
@@ -304,22 +301,20 @@ bool ReadIntPairs(const string &filename, std::vector<std::pair<I, I>> *pairs,
   return true;
 }
 
-// Returns true on success
 template <typename I>
 bool WriteIntPairs(const string &filename,
                    const std::vector<std::pair<I, I>> &pairs) {
   std::ostream *strm = &std::cout;
   if (!filename.empty()) {
-    strm = new std::ofstream(filename.c_str());
+    strm = new std::ofstream(filename);
     if (!*strm) {
       LOG(ERROR) << "WriteIntPairs: Can't open file: " << filename;
       return false;
     }
   }
-
-  for (ssize_t n = 0; n < pairs.size(); ++n)
+  for (ssize_t n = 0; n < pairs.size(); ++n) {
     *strm << pairs[n].first << "\t" << pairs[n].second << "\n";
-
+  }
   if (!*strm) {
     LOG(ERROR) << "WriteIntPairs: Write failed: "
                << (filename.empty() ? "standard output" : filename);
@@ -329,7 +324,7 @@ bool WriteIntPairs(const string &filename,
   return true;
 }
 
-// Utilities for reading/writing label pairs
+// Utilities for reading/writing label pairs.
 
 template <typename Label>
 bool ReadLabelPairs(const string &filename,
@@ -348,23 +343,20 @@ bool WriteLabelPairs(const string &filename,
 
 void ConvertToLegalCSymbol(string *s);
 
-//
-// UTILITIES FOR STREAM I/O
-//
+// Utilities for stream I/O.
 
 bool AlignInput(std::istream &strm);
 bool AlignOutput(std::ostream &strm);
 
-// An associative container for which testing membership is
-// faster than an STL set if members are restricted to an interval
-// that excludes most non-members. A 'Key' must have ==, !=, and < defined.
-// Element 'NoKey' should be a key that marks an uninitialized key and
-// is otherwise unused. 'Find()' returns an STL const_iterator to the match
-// found, otherwise it equals 'End()'.
+// An associative container for which testing membership is faster than an STL
+// set if members are restricted to an interval that excludes most non-members.
+// A Key must have ==, !=, and < operators defined. Element NoKey should be a
+// key that marks an uninitialized key and is otherwise unused. Find() returns
+// an STL const_iterator to the match found, otherwise it equals End().
 template <class Key, Key NoKey>
 class CompactSet {
  public:
-  typedef typename std::set<Key>::const_iterator const_iterator;
+  using const_iterator = typename std::set<Key>::const_iterator;
 
   CompactSet() : min_key_(NoKey), max_key_(NoKey) {}
 
@@ -396,10 +388,11 @@ class CompactSet {
   }
 
   const_iterator Find(Key key) const {
-    if (min_key_ == NoKey || key < min_key_ || max_key_ < key)
+    if (min_key_ == NoKey || key < min_key_ || max_key_ < key) {
       return set_.end();
-    else
+    } else {
       return set_.find(key);
+    }
   }
 
   bool Member(Key key) const {
@@ -408,7 +401,7 @@ class CompactSet {
     } else if (min_key_ != NoKey && max_key_ + 1 == min_key_ + set_.size()) {
       return true;  // dense range
     } else {
-      return set_.find(key) != set_.end();
+      return set_.count(key);
     }
   }
 
@@ -427,7 +420,7 @@ class CompactSet {
   Key min_key_;
   Key max_key_;
 
-  void operator=(const CompactSet<Key, NoKey> &);  // disallow
+  void operator=(const CompactSet &) = delete;
 };
 
 }  // namespace fst

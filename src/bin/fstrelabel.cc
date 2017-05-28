@@ -3,6 +3,8 @@
 //
 // Relabels input or output space of an FST.
 
+#include <cstring>
+
 #include <memory>
 #include <string>
 #include <vector>
@@ -17,28 +19,32 @@ DEFINE_string(relabel_isymbols, "", "Input symbol set to relabel to");
 DEFINE_string(relabel_osymbols, "", "Output symbol set to relabel to");
 DEFINE_string(relabel_ipairs, "", "Input relabel pairs (numeric)");
 DEFINE_string(relabel_opairs, "", "Output relabel pairs (numeric)");
+DEFINE_string(unknown_isymbol, "",
+              "Input symbol to use to relabel OOVs (default: OOVs are errors)");
+DEFINE_string(
+    unknown_osymbol, "",
+    "Output symbol to use to relabel OOVs (default: OOVs are errors)");
 
 DEFINE_bool(allow_negative_labels, false,
             "Allow negative labels (not recommended; may cause conflicts)");
 
 int main(int argc, char** argv) {
   namespace s = fst::script;
+  using fst::script::MutableFstClass;
   using fst::SymbolTable;
   using fst::SymbolTableTextOptions;
-  using fst::script::FstClass;
-  using fst::script::MutableFstClass;
 
   string usage =
       "Relabels the input and/or the output labels of the FST.\n\n"
       "  Usage: ";
   usage += argv[0];
   usage += " [in.fst [out.fst]]\n";
-  usage += " Using SymbolTables flags:\n";
-  usage += "  -relabel_isymbols isyms.txt\n";
-  usage += "  -relabel_osymbols osyms.txt\n";
-  usage += " Using numeric labels flags:\n";
-  usage += "  -relabel_ipairs   ipairs.txt\n";
-  usage += "  -relabel_opairs   opairs.txts\n";
+  usage += "\n Using SymbolTables flags:\n";
+  usage += "  --relabel_isymbols isyms.map\n";
+  usage += "  --relabel_osymbols osyms.map\n";
+  usage += "\n Using numeric labels flags:\n";
+  usage += "  --relabel_ipairs ipairs.txt\n";
+  usage += "  --relabel_opairs opairs.txt\n";
 
   std::set_new_handler(FailedNewHandler);
   SET_FLAGS(usage.c_str(), &argc, &argv, true);
@@ -47,15 +53,16 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name =
+      (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<MutableFstClass> fst(MutableFstClass::Read(in_name, true));
   if (!fst) return 1;
 
   // Relabel with symbol tables.
-  SymbolTableTextOptions opts;
-  opts.allow_negative = FLAGS_allow_negative_labels;
+  const SymbolTableTextOptions opts(FLAGS_allow_negative_labels);
+
   if (!FLAGS_relabel_isymbols.empty() || !FLAGS_relabel_osymbols.empty()) {
     bool attach_new_isymbols = (fst->InputSymbols() != nullptr);
     std::unique_ptr<const SymbolTable> old_isymbols(
@@ -75,9 +82,11 @@ int main(int argc, char** argv) {
             : SymbolTable::ReadText(FLAGS_relabel_osymbols, opts));
     s::Relabel(fst.get(),
                old_isymbols ? old_isymbols.get() : fst->InputSymbols(),
-               relabel_isymbols.get(), attach_new_isymbols,
+               relabel_isymbols.get(), FLAGS_unknown_isymbol,
+               attach_new_isymbols,
                old_osymbols ? old_osymbols.get() : fst->OutputSymbols(),
-               relabel_osymbols.get(), attach_new_osymbols);
+               relabel_osymbols.get(), FLAGS_unknown_osymbol,
+               attach_new_osymbols);
   } else {
     // Reads in relabeling pairs.
     std::vector<s::LabelPair> ipairs;

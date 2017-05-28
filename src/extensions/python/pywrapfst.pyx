@@ -73,6 +73,7 @@ normal `k` prefix.
 # C imports.
 from libc.stdint cimport INT32_MAX
 from libc.stdint cimport SIZE_MAX
+from posix.unistd cimport getpid
 
 # C++ imports.
 from libcpp cimport bool
@@ -202,7 +203,8 @@ cdef string weighttostring(data, encoding="utf8") except *:
   raise FstArgError("Cannot encode as string: {!r}".format(data))
 
 
-cdef fst.ComposeFilter _get_compose_filter(string cf) except *:
+cdef fst.ComposeFilter _get_compose_filter(
+    const string &compose_filter) except *:
   """Matches string with the appropriate ComposeFilter enum value.
 
   This function takes a string argument and returns the matching ComposeFilter
@@ -210,8 +212,8 @@ cdef fst.ComposeFilter _get_compose_filter(string cf) except *:
   by difference and intersection in addition to composition.
 
   Args:
-    cf: A string matching a known composition filter; one of: "alt_sequence",
-        "auto", "match", "null", "sequence", "trivial".
+    compose_filter: A string matching a known composition filter; one of:
+        "alt_sequence", "auto", "match", "null", "sequence", "trivial".
 
   Returns:
     A ComposeFilter enum value.
@@ -221,57 +223,43 @@ cdef fst.ComposeFilter _get_compose_filter(string cf) except *:
 
   This function is not visible to Python users.
   """
-  if cf == b"alt_sequence":
-    return fst.ALT_SEQUENCE_FILTER
-  if cf == b"auto":
-    return fst.AUTO_FILTER
-  if cf == b"match":
-    return fst.MATCH_FILTER
-  if cf == b"null":
-    return fst.NULL_FILTER
-  if cf == b"sequence":
-    return fst.SEQUENCE_FILTER
-  if cf == b"trivial":
-    return fst.TRIVIAL_FILTER
-  raise FstArgError("Unknown compose filter type: {!r}".format(cf))
+  cdef fst.ComposeFilter compose_filter_enum
+  if not fst.GetComposeFilter(compose_filter, addr(compose_filter_enum)):
+    raise FstArgError("Unknown compose filter type: {!r}".format(
+        compose_filter))
+  return compose_filter_enum
 
 
-cdef uint32 _get_encode_mapper_flags(bool encode_labels, bool encode_weights):
-  """Converts encoder booleans to an encoder flag bitmask.
-
-  This function takes as arguments two booleans indicating whether arc labels
-  and/or arc weights are to be encoded.
+cdef fst.DeterminizeType _get_determinize_type(const string &det_type) except *:
+  """Matches string with the appropriate DeterminizeType enum value.
 
   Args:
-    encode_labels: Should labels be encoded?
-    encode_weights: Should weights be encoded?
+    det_type: A string matching a known determinization type; one of:
+        "functional", "nonfunctional", "disambiguate".
 
   Returns:
-    An unsigned integer that can be passed as the "flags" argument to create an
-    encoder.
+    A DeterminizeType enum value.
+
+  Raises:
+    FstArgError: Unknown determinization type.
 
   This function is not visible to Python users.
   """
-  cdef uint32 flags = 0
-  if encode_labels:
-    flags |= fst.kEncodeLabels
-  if encode_weights:
-    flags |= fst.kEncodeWeights
-  if not flags:
-    logging.warning("Specified encoder will perform an identity-mapping; did "
-                    "you mean to request label and/or weight encoding?")
-  return flags
+  cdef fst.DeterminizeType det_type_enum
+  if not fst.GetDeterminizeType(det_type, addr(det_type_enum)):
+    raise FstArgError("Unknown determinization type: {!r}".format(det_type))
+  return det_type_enum
 
 
-cdef fst.QueueType _get_queue_type(string qt) except *:
+cdef fst.QueueType _get_queue_type(const string &queue_type) except *:
   """Matches string with the appropriate QueueType enum value.
 
   This function takes a string argument and returns the matching QueueType enum
   value passed to the RmEpsilonOptions constructor.
 
   Args:
-    qt: A string matching a known queue type; one of: "auto", "fifo", "lifo",
-        "shortest", "state", "top".
+    queue_type: A string matching a known queue type; one of: "auto", "fifo",
+        "lifo", "shortest", "state", "top".
 
   Returns:
     A QueueType enum value.
@@ -281,30 +269,22 @@ cdef fst.QueueType _get_queue_type(string qt) except *:
 
   This function is not visible to Python users.
   """
-  if qt == b"auto":
-    return fst.AUTO_QUEUE
-  if qt == b"fifo":
-    return fst.FIFO_QUEUE
-  if qt == b"lifo":
-    return fst.LIFO_QUEUE
-  if qt == b"shortest":
-    return fst.SHORTEST_FIRST_QUEUE
-  if qt == b"state":
-    return fst.STATE_ORDER_QUEUE
-  if qt == b"top":
-    return fst.TOP_ORDER_QUEUE
-  raise FstArgError("Unknown queue type: {!r}".format(qt))
+  cdef fst.QueueType queue_type_enum
+  if not fst.GetQueueType(queue_type, addr(queue_type_enum)):
+    raise FstArgError("Unknown queue type: {!r}".format(queue_type))
+  return queue_type_enum
 
 
-cdef fst.RandArcSelection _get_rand_arc_selection(string ras) except *:
+cdef fst.RandArcSelection _get_rand_arc_selection(
+    const string &select) except *:
   """Matches string with the appropriate RandArcSelection enum value.
 
   This function takes a string argument and returns the matching
   RandArcSelection enum value passed to the RandGenOptions constructor.
 
   Args:
-    ras: A string matching a known random arc selection type; one of: "uniform",
-        "log_prob", "fast_log_prob".
+    select: A string matching a known random arc selection type; one of:
+        "uniform", "log_prob", "fast_log_prob".
 
   Returns:
     A RandArcSelection enum value.
@@ -314,25 +294,22 @@ cdef fst.RandArcSelection _get_rand_arc_selection(string ras) except *:
 
   This function is not visible to Python users.
   """
-  if ras == b"uniform":
-    return fst.UNIFORM_ARC_SELECTOR
-  if ras == b"log_prob":
-    return fst.LOG_PROB_ARC_SELECTOR
-  if ras == b"fast_log_prob":
-    return fst.FAST_LOG_PROB_ARC_SELECTOR
-  raise FstArgError("Unknown random arc selection type: {!r}".format(ras))
+  cdef fst.RandArcSelection select_enum
+  if not fst.GetRandArcSelection(select, addr(select_enum)):
+    raise FstArgError("Unknown random arc selection type: {!r}".format(select))
+  return select_enum
 
 
-cdef fst.ReplaceLabelType _get_replace_label_type(string rlt,
-    bool epsilon_on_replace) except *:
+cdef fst.ReplaceLabelType _get_replace_label_type(
+    const string &replace_label_type, bool epsilon_on_replace) except *:
   """Matches string with the appropriate ReplaceLabelType enum value.
 
   This function takes a string argument and returns the matching
   ReplaceLabelType enum value passed to the ReplaceOptions constructor.
 
   Args:
-    rlt: A string matching a known replace label type; one of: "neither",
-        "input", "output", "both".
+    replace_label_type: A string matching a known replace label type; one of:
+        "neither", "input", "output", "both".
     epsilon_on_replace: Should call/return arcs be epsilon arcs?
 
   Returns:
@@ -343,15 +320,12 @@ cdef fst.ReplaceLabelType _get_replace_label_type(string rlt,
 
   This function is not visible to Python users.
   """
-  if rlt == b"neither" or epsilon_on_replace:
-    return fst.REPLACE_LABEL_NEITHER
-  if rlt == b"input":
-    return fst.REPLACE_LABEL_INPUT
-  if rlt == b"output":
-    return fst.REPLACE_LABEL_OUTPUT
-  if rlt == b"both":
-    return fst.REPLACE_LABEL_BOTH
-  raise FstArgError("Unknown replace label type: {!r}".format(rlt))
+  cdef fst.ReplaceLabelType replace_label_type_enum
+  if not fst.GetReplaceLabelType(replace_label_type, epsilon_on_replace,
+                                 addr(replace_label_type_enum)):
+    raise FstArgError("Unknown replace label type: {!r}".format(
+                      replace_label_type))
+  return replace_label_type_enum
 
 
 ## Weight and helpers.
@@ -383,6 +357,12 @@ cdef class Weight(object):
 
   def __str__(self):
     return self.to_string()
+
+  # This attempts to convert the string form into a float, raising
+  # ValueError when that is not appropriate.
+
+  def __float__(self):
+    return float(self.to_string())
 
   def __init__(self, weight_type, weight):
     self._weight.reset(new fst.WeightClass(tostring(weight_type),
@@ -727,7 +707,7 @@ cdef class _SymbolTable(object):
       KeyError: Key not found.
     """
     try:
-      result = self._table.FindLabel(tostring(key))
+      result = self._table.FindIndex(tostring(key))
       if result == -1:
         raise KeyError(key)
     except FstArgError:
@@ -735,6 +715,30 @@ cdef class _SymbolTable(object):
       if result == b"":
         raise KeyError(key)
     return result
+
+  cpdef bool member(self, key):
+    """
+    member(self, key)
+
+    Given a symbol or index, returns whether it is found in the table.
+
+    This method returns a boolean indicating whether the given symbol or index
+    is present in the table. If one intends to perform subsequent lookup, it is
+    much better to simply call the find method, catching the KeyError.
+
+    Args:
+      key: Either a string or an index.
+
+    Returns:
+      Whether or not the key is present (as a string or a index) in the table.
+    """
+    try:
+      return self._table.MemberSymbol(tostring(key))
+    except FstArgError:
+      return self._table.MemberIndex(key)
+
+  def __contains__(self, key):
+    return self.member(key)
 
   cpdef int64 get_nth_key(self, ssize_t pos) except *:
     """
@@ -827,16 +831,16 @@ cdef class _FstSymbolTable(_SymbolTable):
 
   Mutable SymbolTable class for tables stored in a mutable FST.
 
-  This class wraps a library SymbolTable and exposes methods of the
-  wrapped object. It is only to be returned by method, never constructed
-  directly.
+  This class wraps a library SymbolTable and exposes methods of the wrapped
+  object. It is only to be returned by method, never constructed directly.
   """
 
   # NB: Do not expose any non-const methods of the wrapped SymbolTable here.
   # Doing so will allow undefined behavior.
 
   def __repr__(self):
-    return "<const Fst SymbolTable {!r} at 0x{:x}>".format(self.name(), id(self))
+    return "<const Fst SymbolTable {!r} at 0x{:x}>".format(self.name(),
+                                                           id(self))
 
 
 cdef class _MutableSymbolTable(_SymbolTable):
@@ -965,7 +969,7 @@ cdef class SymbolTable(_MutableSymbolTable):
     return _init_SymbolTable(tsyms)
 
   @classmethod
-  def read_text(cls, filename):
+  def read_text(cls, filename, bool allow_negative_labels=False):
     """
     SymbolTable.read_text(filename)
 
@@ -975,13 +979,18 @@ cdef class SymbolTable(_MutableSymbolTable):
 
     Args:
       filename: The string location of the input text file.
+      allow_negative_labels: Should negative labels be allowed? (Not
+          recommended; may cause conflicts).
 
     Returns:
       A new SymbolTable instance.
 
     See also: `SymbolTable.read`, `SymbolTable.read_fst`.
     """
-    cdef fst.SymbolTable *tsyms = fst.SymbolTable.ReadText(tostring(filename))
+    cdef unique_ptr[fst.SymbolTableTextOptions] opts
+    opts.reset(new fst.SymbolTableTextOptions(allow_negative_labels))
+    cdef fst.SymbolTable *tsyms = fst.SymbolTable.ReadText(tostring(filename),
+                                                           deref(opts))
     if tsyms == NULL:
       raise FstIOError("Read failed: {!r}".format(filename))
     return _init_SymbolTable(tsyms)
@@ -1225,7 +1234,7 @@ cdef class EncodeMapper(object):
                arc_type=b"standard",
                bool encode_labels=False,
                bool encode_weights=False):
-    cdef uint32 flags = _get_encode_mapper_flags(encode_labels, encode_weights)
+    cdef uint32 flags = fst.GetEncodeFlags(encode_labels, encode_weights)
     self._encoder.reset(new fst.EncodeMapperClass(tostring(arc_type), flags,
                                                   fst.ENCODE))
     if not self._encoder:
@@ -1359,7 +1368,7 @@ cdef class _Fst(object):
                 self._fst.get().OutputSymbols(), NULL,
                 self._fst.get().Properties(fst.kAcceptor, True) ==
                 fst.kAcceptor,
-                b"", 8.5, 11, True, False, 0.4, 0.25, 14, 5, False,
+                b"", 8.5, 11, True, False, 0.4, 0.25, 14, 5, b"g", False,
                 addr(sstrm), b"_repr_svg")
     (sout, serr) = proc.communicate(sstrm.str())
     if proc.returncode != 0:  # Just to be explicit.
@@ -1379,7 +1388,7 @@ cdef class _Fst(object):
     return self.text(acceptor=self._fst.get().Properties(fst.kAcceptor, True) ==
         fst.kAcceptor,
         show_weight_one=self._fst.get().Properties(fst.kWeighted, True) ==
-        fst.kWeighted).decode("utf8")
+        fst.kWeighted)
 
   cpdef string arc_type(self):
     return self._fst.get().ArcType()
@@ -1423,12 +1432,13 @@ cdef class _Fst(object):
                   double nodesep=0.25,
                   int32 fontsize=14,
                   int32 precision=5,
+                  float_format=b"g",
                   bool show_weight_one=False):
     """
     draw(self, filename, isymbols=None, osymbols=None, ssymbols=None,
          acceptor=False, title="", width=8.5, height=11, portrait=False,
          vertical=False, ranksep=0.4, nodesep=0.25, fontsize=14,
-         precision=5, show_weight_one=False):
+         precision=5, float_format="g", show_weight_one=False):
 
     Writes out the FST in Graphviz text format.
 
@@ -1444,14 +1454,15 @@ cdef class _Fst(object):
       title: An optional string indicating the figure title.
       width: The figure width, in inches.
       height: The figure height, in inches.
-      portrait: Should the figure be rendered in portrait rather than landscape
-?
+      portrait: Should the figure be rendered in portrait rather than
+          landscape?
       vertical: Should the figure be rendered bottom-to-top rather than
           left-to-right?
       ranksep: The minimum separation separation between ranks, in inches.
       nodesep: The minimum separation between nodes, in inches.
       fontsize: Font size, in points.
       precision: Numeric precision for floats, in number of chars.
+      float_format: One of: 'e', 'f' or 'g'.
       show_weight_one: Should weights equivalent to semiring One be printed?
 
     For more information about the rendering options, see `man dot`.
@@ -1470,8 +1481,9 @@ cdef class _Fst(object):
         self._fst.get().OutputSymbols() if osymbols is None
         else osymbols._table,
         ssymbols_ptr, acceptor, tostring(title), width, height, portrait,
-        vertical, ranksep, nodesep, fontsize, precision, show_weight_one,
-        ostrm.get(), filename_string)
+        vertical, ranksep, nodesep, fontsize, precision,
+        tostring(float_format), show_weight_one, ostrm.get(),
+        filename_string)
 
   cpdef Weight final(self, int64 state):
     """
@@ -1573,9 +1585,9 @@ cdef class _Fst(object):
     return _init_FstSymbolTable(const_cast[SymbolTable_ptr](
         self._fst.get().OutputSymbols()), self._fst)
 
-  cpdef uint64 properties(self, uint64 mask, bool test=True):
+  cpdef uint64 properties(self, uint64 mask, bool test):
     """
-    properties(self, mask, test=True)
+    properties(self, mask, test)
 
     Provides property bits.
 
@@ -1634,10 +1646,10 @@ cdef class _Fst(object):
       A formatted string representing the machine.
     """
     # Prints FST to stringstream, then returns resulting string.
-    cdef stringstream sstrm
     cdef fst.SymbolTable *ssymbols_ptr = NULL
     if ssymbols is not None:
       ssymbols_ptr = ssymbols._table
+    cdef stringstream sstrm
     fst.PrintFst(deref(self._fst), sstrm, "<pywrapfst>",
         self._fst.get().InputSymbols() if isymbols is None
         else isymbols._table,
@@ -1684,6 +1696,9 @@ cdef class _Fst(object):
     """
     if not self._fst.get().Write(tostring(filename)):
       raise FstIOError("Write failed: {!r}".format(filename))
+
+  cpdef string WriteToString(self):
+    return self._fst.get().WriteToString()
 
 
 cdef class _MutableFst(_Fst):
@@ -1749,15 +1764,10 @@ cdef class _MutableFst(_Fst):
     return result
 
   cdef void _arcsort(self, sort_type=b"ilabel") except *:
-    cdef fst.ArcSortType ast
-    sort_type = tostring(sort_type)
-    if sort_type == b"ilabel":
-      ast = fst.ILABEL_COMPARE
-    elif sort_type == b"olabel":
-      ast = fst.OLABEL_COMPARE
-    else:
+    cdef fst.ArcSortType sort_type_enum
+    if not fst.GetArcSortType(tostring(sort_type), addr(sort_type_enum)):
       raise FstArgError("Unknown sort type {!r}".format(sort_type))
-    fst.ArcSort(self._mfst.get(), ast)
+    fst.ArcSort(self._mfst.get(), sort_type_enum)
     self._check_mutating_imethod()
 
   def arcsort(self, sort_type=b"ilabel"):
@@ -1785,8 +1795,7 @@ cdef class _MutableFst(_Fst):
     return self
 
   cdef void _closure(self, bool closure_plus=False) except *:
-    fst.Closure(self._mfst.get(),
-                fst.CLOSURE_PLUS if closure_plus else fst.CLOSURE_STAR)
+    fst.Closure(self._mfst.get(), fst.GetClosureType(closure_plus))
     self._check_mutating_imethod()
 
   def closure(self, bool closure_plus=False):
@@ -1982,14 +1991,15 @@ cdef class _MutableFst(_Fst):
     self._invert()
     return self
 
-  cdef void _minimize(self, float delta=fst.kDelta) except *:
+  cdef void _minimize(self, float delta=fst.kDelta,
+                      bool allow_nondet=False) except *:
     # This runs in-place when the second argument is null.
-    fst.Minimize(self._mfst.get(), NULL, delta)
+    fst.Minimize(self._mfst.get(), NULL, delta, allow_nondet)
     self._check_mutating_imethod()
 
-  def minimize(self, float delta=fst.kDelta):
+  def minimize(self, float delta=fst.kDelta, bool allow_nondet=False):
     """
-    minimize(self, delta=0.0009765625)
+    minimize(self, delta=0.0009765625, allow_nondet=False)
 
     Minimizes the FST.
 
@@ -2008,6 +2018,7 @@ cdef class _MutableFst(_Fst):
 
     Args:
       delta: Comparison/quantization delta.
+      allow_nondet: Attempt minimization of non-deterministic FST?
 
     Returns:
       self.
@@ -2048,8 +2059,7 @@ cdef class _MutableFst(_Fst):
     return self._mfst.get().NumStates()
 
   cdef void _project(self, bool project_output=False) except *:
-    fst.Project(self._mfst.get(),
-                fst.PROJECT_OUTPUT if project_output else fst.PROJECT_INPUT)
+    fst.Project(self._mfst.get(), fst.GetProjectType(project_output))
     self._check_mutating_imethod()
 
   def project(self, bool project_output=False):
@@ -2113,9 +2123,8 @@ cdef class _MutableFst(_Fst):
                   float delta=fst.kDelta,
                   bool remove_total_weight=False,
                   bool to_final=False) except *:
-    cdef fst.ReweightType rt = (fst.REWEIGHT_TO_FINAL if to_final else
-                                fst.REWEIGHT_TO_INITIAL)
-    fst.Push(self._mfst.get(), rt, delta, remove_total_weight)
+    fst.Push(self._mfst.get(), fst.GetReweightType(to_final), delta,
+             remove_total_weight)
     self._check_mutating_imethod()
 
   def push(self,
@@ -2196,9 +2205,11 @@ cdef class _MutableFst(_Fst):
   cdef void _relabel_tables(self,
                             _SymbolTable old_isymbols=None,
                             _SymbolTable new_isymbols=None,
+                            unknown_isymbol=b"",
                             bool attach_new_isymbols=True,
                             _SymbolTable old_osymbols=None,
                             _SymbolTable new_osymbols=None,
+                            unknown_osymbol=b"",
                             bool attach_new_osymbols=True) except *:
     if new_isymbols is None and new_osymbols is None:
       raise FstArgError("No new SymbolTables specified")
@@ -2210,22 +2221,27 @@ cdef class _MutableFst(_Fst):
       new_osymbols_ptr = new_osymbols._table
     fst.Relabel(self._mfst.get(),
         self._fst.get().InputSymbols() if old_isymbols is None else
-        old_isymbols._table, new_isymbols_ptr, attach_new_isymbols,
+        old_isymbols._table, new_isymbols_ptr, tostring(unknown_isymbol),
+        attach_new_isymbols,
         self._fst.get().OutputSymbols() if old_osymbols is None else
-        old_osymbols._table, new_osymbols_ptr, attach_new_osymbols)
+        old_osymbols._table, new_osymbols_ptr, tostring(unknown_osymbol),
+        attach_new_osymbols)
     self._check_mutating_imethod()
 
   def relabel_tables(self,
                      _SymbolTable old_isymbols=None,
-                    _SymbolTable new_isymbols=None,
-                    bool attach_new_isymbols=True,
-                    _SymbolTable old_osymbols=None,
-                    _SymbolTable new_osymbols=None,
-                    bool attach_new_osymbols=True):
+                     _SymbolTable new_isymbols=None,
+                     unknown_isymbol=b"",
+                     bool attach_new_isymbols=True,
+                     _SymbolTable old_osymbols=None,
+                     _SymbolTable new_osymbols=None,
+                     unknown_osymbol=b"",
+                     bool attach_new_osymbols=True):
     """
     relabel_tables(self, old_isymbols=None, new_isymbols=None,
-                   attach_new_isymbols=True, old_osymbols=None,
-                   new_osymbols=None, attach_new_osymbols=True)
+                   unknown_isymbol="", attach_new_isymbols=True,
+                   old_osymbols=None, new_osymbols=None,
+                   unknown_osymbol="", attach_new_osymbols=True)
 
     Replaces input and/or output labels using SymbolTables.
 
@@ -2236,11 +2252,15 @@ cdef class _MutableFst(_Fst):
        old_isymbols: The old SymbolTable for input labels, defaulting to the
           FST's input symbol table.
        new_isymbols: A SymbolTable used to relabel the input labels
+       unknown_isymbol: Input symbol to use to relabel OOVs (if empty,
+          OOVs raise an exception)
        attach_new_isymbols: Should new_isymbols be made the FST's input symbol
           table?
        old_osymbols: The old SymbolTable for output labels, defaulting to the
           FST's output symbol table.
        new_osymbols: A SymbolTable used to relabel the output labels.
+       unknown_osymbol: Outnput symbol to use to relabel OOVs (if empty,
+          OOVs raise an exception)
        attach_new_isymbols: Should new_osymbols be made the FST's output symbol
           table?
 
@@ -2252,8 +2272,10 @@ cdef class _MutableFst(_Fst):
 
     See also: `decode`, `encode`, `project`, `relabel_pairs`.
     """
-    self._relabel_tables(old_isymbols, new_isymbols, attach_new_isymbols,
-                         old_osymbols, new_osymbols, attach_new_osymbols)
+    self._relabel_tables(old_isymbols, new_isymbols,
+                         unknown_isymbol, attach_new_isymbols,
+                         old_osymbols, new_osymbols,
+                         unknown_osymbol, attach_new_osymbols)
     return self
 
   cdef void _reserve_arcs(self, int64 state, size_t n) except *:
@@ -2304,15 +2326,14 @@ cdef class _MutableFst(_Fst):
     return self
 
   cdef void _reweight(self, potentials, bool to_final=False) except *:
-    cdef fst.ReweightType rt = (fst.REWEIGHT_TO_FINAL if to_final else
-                                fst.REWEIGHT_TO_INITIAL)
     cdef unique_ptr[vector[fst.WeightClass]] _potentials
     _potentials.reset(new vector[fst.WeightClass]())
     cdef string weight_type = self.weight_type()
     for weight in potentials:
         _potentials.get().push_back(_get_WeightClass_or_One(self.weight_type(),
                                                             weight))
-    fst.Reweight(self._mfst.get(), deref(_potentials), rt)
+    fst.Reweight(self._mfst.get(), deref(_potentials),
+                 fst.GetReweightType(to_final))
     self._check_mutating_imethod()
 
   def reweight(self, potentials, bool to_final=False):
@@ -2386,7 +2407,7 @@ cdef class _MutableFst(_Fst):
     cdef fst.WeightClass wc = _get_WeightClass_or_One(self.weight_type(),
                                                       weight)
     if not self._mfst.get().SetFinal(state, wc):
-      raise FstOpError("incompatible or invalid weight")
+      raise FstOpError("Incompatible or invalid weight")
     self._check_mutating_imethod()
 
   def set_final(self, int64 state, weight=None):
@@ -2402,7 +2423,7 @@ cdef class _MutableFst(_Fst):
 
     Raises:
       FstIndexError: State index out of range.
-      FstOpError: incompatible or invalid weight.
+      FstOpError: Incompatible or invalid weight.
 
     See also: `set_start`.
     """
@@ -2623,6 +2644,15 @@ cdef _Fst _read_Fst(filename, fst_type=None):
         raise FstOpError("Conversion to {!r} failed.".format(fst_type))
   return _init_XFst(tfst)
 
+cdef _Fst _deserialize_Fst(fst_string, fst_type=None):
+  ofst = fst.FstClass.ReadFromString(fst_string)
+  if fst_type is not None:
+    fst_type_string = tostring(fst_type)
+    if fst_type_string != ofst.FstType():
+      ofst = fst.Convert(deref(ofst), fst_type_string)
+      if ofst == NULL:
+        raise FstOpError("Conversion to {!r} failed.".format(fst_type))
+  return _init_XFst(ofst)
 
 class Fst(object):
 
@@ -2665,6 +2695,26 @@ class Fst(object):
      """
      return _read_Fst(filename, fst_type)
 
+   @staticmethod
+   def read_from_string(fst_string, fst_type=None):
+     """
+     read_from_string(fst_string, fst_type=None)
+
+     Reads an FST from a string.
+
+     Args:
+       fst_string: The string containing the serialized Fst.
+       fst_type: A string indicating the FST type to convert to; no conversion
+         is performed if omitted or if the FST is already of the desired type.
+
+     Returns:
+       An FST object.
+
+     Raises:
+       FstIOError: Read failed.
+       FstOpError: Read-time conversion failed.
+     """
+     return _deserialize_Fst(fst_string, fst_type)
 
 ## FST properties.
 
@@ -3174,40 +3224,13 @@ cdef _Fst _map(_Fst ifst,
                float delta=fst.kDelta,
                map_type=b"identity",
                weight=None):
-  cdef fst.MapType mt
-  cdef map_type_string = tostring(map_type)
-  if map_type_string == b"arc_sum":
-    mt = fst.ARC_SUM_MAPPER
-  elif map_type_string == b"identity":
-    mt = fst.IDENTITY_MAPPER
-  elif map_type_string == b"input_epsilon":
-    mt = fst.INPUT_EPSILON_MAPPER
-  elif map_type_string == b"invert":
-    mt = fst.INVERT_MAPPER
-  elif map_type_string == b"output_epsilon":
-    mt = fst.OUTPUT_EPSILON_MAPPER
-  elif map_type_string == b"plus":
-    mt = fst.PLUS_MAPPER
-  elif map_type_string == b"quantize":
-    mt = fst.QUANTIZE_MAPPER
-  elif map_type_string == b"rmweight":
-    mt = fst.RMWEIGHT_MAPPER
-  elif map_type_string == b"superfinal":
-    mt = fst.SUPERFINAL_MAPPER
-  elif map_type_string == b"times":
-    mt = fst.TIMES_MAPPER
-  elif map_type_string == b"to_log":
-    mt = fst.TO_LOG_MAPPER
-  elif map_type_string == b"to_log64":
-    mt = fst.TO_LOG64_MAPPER
-  elif map_type_string == b"to_standard":
-    mt = fst.TO_STD_MAPPER
-  else:
+  cdef fst.MapType map_type_enum
+  if not fst.GetMapType(tostring(map_type), addr(map_type_enum)):
     raise FstArgError("Unknown map type: {!r}".format(map_type))
   cdef fst.WeightClass wc = (_get_WeightClass_or_One(ifst.weight_type(),
-      weight) if mt == fst.TIMES_MAPPER else
+      weight) if map_type_enum == fst.TIMES_MAPPER else
       _get_WeightClass_or_Zero(ifst.weight_type(), weight))
-  return _init_XFst(fst.Map(deref(ifst._fst), mt, delta, wc))
+  return _init_XFst(fst.Map(deref(ifst._fst), map_type_enum, delta, wc))
 
 
 cpdef _Fst arcmap(_Fst ifst,
@@ -3241,8 +3264,8 @@ cpdef _Fst arcmap(_Fst ifst,
         `quantize`).
     map_type: A string matching a known mapping operation (see above).
     weight: A Weight or weight string passed to the arc-mapper; this is ignored
-      unless `map_type` is `plus` (in which case it defaults to semiring Zero)
-      or `times` (in which case it defaults to semiring One).
+        unless `map_type` is `plus` (in which case it defaults to semiring Zero)
+        or `times` (in which case it defaults to semiring One).
 
   Returns:
     An FST with arcs and final states remapped.
@@ -3257,10 +3280,10 @@ cpdef _Fst arcmap(_Fst ifst,
 
 cpdef _MutableFst compose(_Fst ifst1,
                           _Fst ifst2,
-                          cf=b"auto",
+                          compose_filter=b"auto",
                           bool connect=True):
   """
-  compose(ifst1, ifst2, cf="auto", connect=True)
+  compose(ifst1, ifst2, compose_filter="auto", connect=True)
 
   Constructively composes two FSTs.
 
@@ -3273,8 +3296,8 @@ cpdef _MutableFst compose(_Fst ifst1,
   Args:
     ifst1: The first input FST.
     ifst2: The second input FST.
-    cf: A string matching a known composition filter; one of: "alt_sequence",
-        "auto", "match", "null", "sequence", "trivial".
+    compose_filter: A string matching a known composition filter; one of:
+        "alt_sequence", "auto", "match", "null", "sequence", "trivial".
     connect: Should output be trimmed?
 
   Returns:
@@ -3284,7 +3307,8 @@ cpdef _MutableFst compose(_Fst ifst1,
   """
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst1.arc_type())
   cdef unique_ptr[fst.ComposeOptions] opts
-  opts.reset(new fst.ComposeOptions(connect, _get_compose_filter(tostring(cf))))
+  opts.reset(new fst.ComposeOptions(connect,
+      _get_compose_filter(tostring(compose_filter))))
   fst.Compose(deref(ifst1._fst), deref(ifst2._fst), tfst, deref(opts))
   return _init_MutableFst(tfst)
 
@@ -3335,10 +3359,10 @@ cpdef _MutableFst determinize(_Fst ifst,
   Args:
     ifst: The input FST.
     delta: Comparison/quantization delta.
-    det_type: Type of determinization; one of: "functional" (input transducer
-        is functional), "nonfunctional" (input transducer is not functional)
-        and "disambiguate" (input transducer is not functional but only keep
-        the min of ambiguous outputs).
+    det_type: Type of determinization; one of: "functional" (input transducer is
+        functional), "nonfunctional" (input transducer is not functional) and
+        disambiguate" (input transducer is not functional but only keep the min
+        of ambiguous outputs).
     nstate: State number threshold.
     subsequential_label: Input label of arc corresponding to residual final
         output when producing a subsequential transducer.
@@ -3359,29 +3383,24 @@ cpdef _MutableFst determinize(_Fst ifst,
   # Threshold is set to semiring Zero (no pruning) if weight unspecified.
   cdef fst.WeightClass wc = _get_WeightClass_or_Zero(ifst.weight_type(),
                                                      weight)
-  det_type = tostring(det_type)
-  cdef fst.DeterminizeType dt = fst.DETERMINIZE_FUNCTIONAL
-  if det_type == b"functional":
-    dt = fst.DETERMINIZE_FUNCTIONAL
-  elif det_type == b"nonfunctional":
-    dt = fst.DETERMINIZE_NONFUNCTIONAL
-  elif det_type == b"disambiguate":
-    dt = fst.DETERMINIZE_DISAMBIGUATE
-  else:
-    raise FstArgError("Unknown determinization type: {!r}".format(type))
+  cdef fst.DeterminizeType determinize_type_enum
+  if not fst.GetDeterminizeType(tostring(det_type),
+                                addr(determinize_type_enum)):
+    raise FstArgError("Unknown determinization type: {!r}".format(det_type))
   cdef unique_ptr[fst.DeterminizeOptions] opts
   opts.reset(new fst.DeterminizeOptions(delta, wc, nstate, subsequential_label,
-                                        dt, increment_subsequential_label))
+                                        determinize_type_enum,
+                                        increment_subsequential_label))
   fst.Determinize(deref(ifst._fst), tfst, deref(opts))
   return _init_MutableFst(tfst)
 
 
 cpdef _MutableFst difference(_Fst ifst1,
                              _Fst ifst2,
-                             cf=b"auto",
+                             compose_filter=b"auto",
                              bool connect=True):
   """
-  difference(ifst1, ifst2, cf="auto", connect=True)
+  difference(ifst1, ifst2, compose_filter="auto", connect=True)
 
   Constructively computes the difference of two FSTs.
 
@@ -3395,8 +3414,8 @@ cpdef _MutableFst difference(_Fst ifst1,
   Args:
     ifst1: The first input FST.
     ifst2: The second input FST.
-    cf: A string matching a known composition filter; one of: "alt_sequence",
-        "auto", "match", "null", "sequence", "trivial".
+    compose_filter: A string matching a known composition filter; one of:
+        "alt_sequence", "auto", "match", "null", "sequence", "trivial".
     connect: Should the output FST be trimmed?
 
   Returns:
@@ -3404,7 +3423,8 @@ cpdef _MutableFst difference(_Fst ifst1,
   """
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst1.arc_type())
   cdef unique_ptr[fst.ComposeOptions] opts
-  opts.reset(new fst.ComposeOptions(connect, _get_compose_filter(tostring(cf))))
+  opts.reset(new fst.ComposeOptions(connect, _get_compose_filter(
+      tostring(compose_filter))))
   fst.Difference(deref(ifst1._fst), deref(ifst2._fst), tfst, deref(opts))
   return _init_MutableFst(tfst)
 
@@ -3526,8 +3546,8 @@ cpdef bool equivalent(_Fst ifst1, _Fst ifst2, float delta=fst.kDelta) except *:
   See also: `equal`, `isomorphic`, `randequivalent`.
   """
   cdef bool error
-  cdef bool result
-  result = fst.Equivalent(deref(ifst1._fst), deref(ifst2._fst), delta, &error)
+  cdef bool result = fst.Equivalent(deref(ifst1._fst), deref(ifst2._fst), delta,
+                                    addr(error))
   if error:
     raise FstOpError("Equivalence test encountered error")
   return result
@@ -3535,10 +3555,10 @@ cpdef bool equivalent(_Fst ifst1, _Fst ifst2, float delta=fst.kDelta) except *:
 
 cpdef _MutableFst intersect(_Fst ifst1,
                             _Fst ifst2,
-                            cf=b"auto",
+                            compose_filter=b"auto",
                             bool connect=True):
   """
-  intersect(ifst1, ifst2, cf="auto", connect=True)
+  intersect(ifst1, ifst2, compose_filter="auto", connect=True)
 
   Constructively intersects two FSTs.
 
@@ -3550,8 +3570,8 @@ cpdef _MutableFst intersect(_Fst ifst1,
   Args:
     ifst1: The first input FST.
     ifst2: The second input FST.
-    cf: A string matching a known composition filter; one of: "alt_sequence",
-        "auto", "match", "null", "sequence", "trivial".
+    compose_filter: A string matching a known composition filter; one of:
+        "alt_sequence", "auto", "match", "null", "sequence", "trivial".
     connect: Should output be trimmed?
 
   Returns:
@@ -3559,12 +3579,13 @@ cpdef _MutableFst intersect(_Fst ifst1,
   """
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst1.arc_type())
   cdef unique_ptr[fst.ComposeOptions] opts
-  opts.reset(new fst.ComposeOptions(connect, _get_compose_filter(tostring(cf))))
+  opts.reset(new fst.ComposeOptions(connect,
+        _get_compose_filter(tostring(compose_filter))))
   fst.Intersect(deref(ifst1._fst), deref(ifst2._fst), tfst, deref(opts))
   return _init_MutableFst(tfst)
 
 
-cpdef bool isomorphic(_Fst ifst1, _Fst ifst2, float delta=fst.kDelta) except *:
+cpdef bool isomorphic(_Fst ifst1, _Fst ifst2, float delta=fst.kDelta):
   """
   isomorphic(ifst1, ifst2, delta=0.0009765625)
 
@@ -3585,17 +3606,9 @@ cpdef bool isomorphic(_Fst ifst1, _Fst ifst2, float delta=fst.kDelta) except *:
   Returns:
     True if the two transducers satisfy the above condition, else False.
 
-  Raises:
-    FstOpError: Isomorphism test encountered error.
-
   See also: `equal`, `equivalent`, `randequivalent`.
   """
-  cdef bool error
-  cdef bool result
-  result = fst.Isomorphic(deref(ifst1._fst), deref(ifst2._fst), delta, &error)
-  if error:
-    raise FstOpError("Isomorphism test encountered error")
-  return result
+  return fst.Isomorphic(deref(ifst1._fst), deref(ifst2._fst), delta)
 
 
 cpdef _MutableFst prune(_Fst ifst,
@@ -3676,31 +3689,22 @@ cpdef _MutableFst push(_Fst ifst,
   """
   # This is copied, almost verbatim, from ./fstpush.cc.
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst.arc_type())
-  cdef uint32 flags = 0
-  if push_weights:
-    flags |= fst.kPushWeights
-  if push_labels:
-    flags |= fst.kPushLabels
-  if remove_common_affix:
-    flags |= fst.kPushRemoveCommonAffix
-  if remove_total_weight:
-    flags |= fst.kPushRemoveTotalWeight
-  cdef fst.ReweightType rt = (fst.REWEIGHT_TO_FINAL if to_final else
-                              fst.REWEIGHT_TO_INITIAL)
-  fst.Push(deref(ifst._fst), tfst, flags, rt, delta)
+  cdef uint32 flags = fst.GetPushFlags(push_weights, push_labels,
+                                       remove_common_affix, remove_total_weight)
+  fst.Push(deref(ifst._fst), tfst, flags, fst.GetReweightType(to_final), delta)
   return _init_MutableFst(tfst)
 
 
 cpdef bool randequivalent(_Fst ifst1,
                           _Fst ifst2,
-                          float delta=fst.kDelta,
-                          int32 max_length=INT32_MAX,
                           int32 npath=1,
+                          float delta=fst.kDelta,
                           time_t seed=0,
-                          select=b"uniform") except *:
+                          select=b"uniform",
+                          int32 max_length=INT32_MAX) except *:
   """
-  randequivalent(ifst1, ifst2, delta=0.0009765625, max_length=INT32_MAX,
-                 npath=1, seed=time(0), select="uniform")
+  randequivalent(ifst1, ifst2, npath=1, delta=0.0009765625, seed=0,
+                 select="uniform", max_length=2147483647)
 
   Are two acceptors stochastically equivalent?
 
@@ -3713,12 +3717,13 @@ cpdef bool randequivalent(_Fst ifst1,
   Args:
     ifst1: The first input FST.
     ifst2: The second input FST.
-    delta: Comparison/quantization delta.
-    max_length: The maximum length of each random path.
     npath: The number of random paths to generate.
-    seed: An optional seed value for random path generation.
+    delta: Comparison/quantization delta.
+    seed: An optional seed value for random path generation; if zero, the
+        current time and process ID is used.
     select: A string matching a known random arc selection type; one of:
         "uniform", "log_prob", "fast_log_prob".
+    max_length: The maximum length of each random path.
 
   Returns:
     True if the two transducers satisfy the above condition, else False.
@@ -3730,28 +3735,30 @@ cpdef bool randequivalent(_Fst ifst1,
   """
   cdef fst.RandArcSelection ras = _get_rand_arc_selection(tostring(select))
   cdef unique_ptr[fst.RandGenOptions[fst.RandArcSelection]] opts
-  opts.reset(new fst.RandGenOptions[fst.RandArcSelection](ras, max_length))
+  # The three trailing options will be ignored by RandEquivalent.
+  opts.reset(new fst.RandGenOptions[fst.RandArcSelection](ras, max_length,
+                                                          1, False, False))
   if seed == 0:
-    seed = time(NULL)
+    seed = time(NULL) + getpid()
   cdef bool error
   cdef bool result = fst.RandEquivalent(deref(ifst1._fst), deref(ifst2._fst),
-                                        seed, npath, delta, deref(opts),
-                                        &error)
+                                        npath, delta, seed, deref(opts),
+                                        addr(error))
   if error:
     raise FstOpError("Random equivalence test encountered error")
   return result
 
 
 cpdef _MutableFst randgen(_Fst ifst,
-                          int32 max_length=INT32_MAX,
                           int32 npath=1,
-                          bool remove_total_weight=False,
                           time_t seed=0,
                           select=b"uniform",
-                          bool weighted=False):
+                          int32 max_length=INT32_MAX,
+                          bool weighted=False,
+                          bool remove_total_weight=False):
   """
-  randgen(ifst, max_length=INT32_MAX, npath=1, remove_total_weight=False,
-          seed=time(0), select="uniform", weighted=False)
+  randgen(ifst, npath=1, seed=0, select="uniform", max_length=2147483647,
+          weight=False, remove_total_weight=False)
 
   Randomly generate successful paths in an FST.
 
@@ -3765,14 +3772,15 @@ cpdef _MutableFst randgen(_Fst ifst,
 
   Args:
     ifst: The input FST.
-    max_length: The maximum length of each random path.
     npath: The number of random paths to generate.
-    remove_total_weight: Should the total weight be removed (ignored when
-        `weighted` is False)?
-    seed: An optional seed value for random path generation.
+    seed: An optional seed value for random path generation; if zero, the
+        current time and process ID is used.
     select: A string matching a known random arc selection type; one of:
         "uniform", "log_prob", "fast_log_prob".
+    max_length: The maximum length of each random path.
     weighted: Should the output be weighted by path count?
+    remove_total_weight: Should the total weight be removed (ignored when
+        `weighted` is False)?
 
   Returns:
     An Fst containing one or more random paths.
@@ -3781,10 +3789,12 @@ cpdef _MutableFst randgen(_Fst ifst,
   """
   cdef fst.RandArcSelection ras = _get_rand_arc_selection(tostring(select))
   cdef unique_ptr[fst.RandGenOptions[fst.RandArcSelection]] opts
-  opts.reset(new fst.RandGenOptions[fst.RandArcSelection](ras, max_length))
+  opts.reset(new fst.RandGenOptions[fst.RandArcSelection](ras, max_length,
+                                                          npath, weighted,
+                                                          remove_total_weight))
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst.arc_type())
   if seed == 0:
-    seed = time(NULL)
+    seed = time(NULL) + getpid()
   fst.RandGen(deref(ifst._fst), tfst, seed, deref(opts))
   return _init_MutableFst(tfst)
 
@@ -3840,12 +3850,10 @@ cpdef _MutableFst replace(pairs,
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst.arc_type())
   for (label, ifst) in it:
     _pairs.push_back(fst.LabelFstClassPair(label, ifst._fst.get()))
-  cdef string call_arc_labeling_ = tostring(call_arc_labeling)
-  cdef string return_arc_labeling_ = tostring(return_arc_labeling)
-  cdef fst.ReplaceLabelType cal = _get_replace_label_type(call_arc_labeling_,
-                                                          epsilon_on_replace)
-  cdef fst.ReplaceLabelType ral = _get_replace_label_type(return_arc_labeling_,
-                                                          epsilon_on_replace)
+  cdef fst.ReplaceLabelType cal = _get_replace_label_type(
+      tostring(call_arc_labeling), epsilon_on_replace)
+  cdef fst.ReplaceLabelType ral = _get_replace_label_type(
+      tostring(return_arc_labeling), epsilon_on_replace)
   cdef unique_ptr[fst.ReplaceOptions] opts
   opts.reset(new fst.ReplaceOptions(root_label, cal, ral, return_label))
   fst.Replace(_pairs, tfst, deref(opts))
@@ -3880,12 +3888,12 @@ cpdef _MutableFst rmepsilon(_Fst ifst,
                             bool connect=True,
                             float delta=fst.kDelta,
                             int64 nstate=fst.kNoStateId,
-                            qt=b"auto",
+                            queue_type=b"auto",
                             bool reverse=False,
                             weight=None):
   """
-  rmepsilon(ifst, connect=True, delta=0.0009765625, nstate=-1, qt="auto",
-            reverse=False, weight=None)
+  rmepsilon(ifst, connect=True, delta=0.0009765625, nstate=-1,
+            queue_type="auto", reverse=False, weight=None)
 
   Constructively removes epsilon transitions from an FST.
 
@@ -3897,8 +3905,8 @@ cpdef _MutableFst rmepsilon(_Fst ifst,
     connect: Should output be trimmed?
     delta: Comparison/quantization delta.
     nstate: State number threshold.
-    qt: A string matching a known queue type; one of: "auto", "fifo", "lifo",
-        "shortest", "state", "top".
+    queue_type: A string matching a known queue type; one of: "auto", "fifo",
+        "lifo", "shortest", "state", "top".
     reverse: Should epsilon transitions be removed in reverse order?
     weight: A string indicating the desired weight threshold; paths with
         weights below this threshold will be pruned.
@@ -3908,8 +3916,8 @@ cpdef _MutableFst rmepsilon(_Fst ifst,
   """
   cdef fst.WeightClass wc = _get_WeightClass_or_Zero(ifst.weight_type(), weight)
   cdef unique_ptr[fst.RmEpsilonOptions] opts
-  opts.reset(new fst.RmEpsilonOptions(_get_queue_type(tostring(qt)), delta,
-                                      connect, wc, nstate))
+  opts.reset(new fst.RmEpsilonOptions(_get_queue_type(tostring(queue_type)),
+                                      delta, connect, wc, nstate))
   cdef VectorFstClass_ptr tfst = new fst.VectorFstClass(ifst.arc_type())
   fst.RmEpsilon(deref(ifst._fst), tfst, reverse, deref(opts))
   return _init_MutableFst(tfst)
@@ -3919,30 +3927,32 @@ cpdef _MutableFst rmepsilon(_Fst ifst,
 
 
 cdef vector[fst.WeightClass] *_shortestdistance(_Fst ifst,
-    float delta=fst.kDelta, int64 nstate=fst.kNoStateId, qt=b"auto",
+    float delta=fst.kDelta, int64 nstate=fst.kNoStateId, queue_type=b"auto",
     bool reverse=False) except *:
-  cdef vector[fst.WeightClass] *distance = new vector[fst.WeightClass]()
+  cdef unique_ptr[vector[fst.WeightClass]] distance
+  distance.reset(new vector[fst.WeightClass]())
   # For scoping reasons, these have to be declared here even though they may
   # not be used in all cases.
   cdef unique_ptr[fst.ShortestDistanceOptions] opts
   if reverse:
     # Only the simpler signature supports shortest distance to final states;
-    # `nstate` and `qt` arguments are ignored.
-    fst.ShortestDistance(deref(ifst._fst), distance, True, delta)
+    # `nstate` and `queue_type` arguments are ignored.
+    fst.ShortestDistance(deref(ifst._fst), distance.get(), True, delta)
   else:
     opts.reset(new fst.ShortestDistanceOptions(
-        _get_queue_type(tostring(qt)), fst.ANY_ARC_FILTER, nstate, delta))
-    fst.ShortestDistance(deref(ifst._fst), distance, deref(opts))
-  return distance
+        _get_queue_type(tostring(queue_type)), fst.ANY_ARC_FILTER, nstate,
+        delta))
+    fst.ShortestDistance(deref(ifst._fst), distance.get(), deref(opts))
+  return distance.release()
 
 
 def shortestdistance(_Fst ifst,
                      float delta=fst.kDelta,
                      int64 nstate=fst.kNoStateId,
-                     qt=b"auto",
+                     queue_type=b"auto",
                      bool reverse=False):
   """
-  shortestdistance(ifst, delta=0.0009765625, nstate=-1, qt="auto",
+  shortestdistance(ifst, delta=0.0009765625, nstate=-1, queue_type="auto",
                    reverse=False)
 
   Compute the shortest distance from the initial or final state.
@@ -3959,8 +3969,9 @@ def shortestdistance(_Fst ifst,
     ifst: The input FST.
     delta: Comparison/quantization delta.
     nstate: State number threshold (this is ignored if `reverse` is True).
-    qt: A string matching a known queue type; one of: "auto", "fifo", "lifo",
-        "shortest", "state", "top" (this is ignored if `reverse` is True).
+    queue_type: A string matching a known queue type; one of: "auto", "fifo",
+        "lifo", "shortest", "state", "top" (this is ignored if `reverse` is
+        True).
     reverse: Should the reverse distance (from each state to the final state)
         be computed?
 
@@ -3968,7 +3979,7 @@ def shortestdistance(_Fst ifst,
     A list of Weight objects representing the shortest distance for each state.
   """
   cdef unique_ptr[vector[fst.WeightClass]] distance
-  distance.reset(_shortestdistance(ifst, delta, nstate, qt, reverse))
+  distance.reset(_shortestdistance(ifst, delta, nstate, queue_type, reverse))
   # Packs the distances, as strings, into a Python list.
   cdef string weight_type = ifst.weight_type()
   result = []
@@ -3984,12 +3995,12 @@ cpdef _MutableFst shortestpath(_Fst ifst,
                                float delta=fst.kDelta,
                                int32 nshortest=1,
                                int64 nstate=fst.kNoStateId,
-                               qt=b"auto",
+                               queue_type=b"auto",
                                bool unique=False,
                                weight=None):
   """
-  shortestpath(ifst, delta=0.0009765625, nshortest=1, nstate=-1, qt="auto",
-               unique=False, weight=None)
+  shortestpath(ifst, delta=0.0009765625, nshortest=1, nstate=-1,
+               queue_type="auto", unique=False, weight=None)
 
   Construct an FST containing the shortest path(s) in the input FST.
 
@@ -4006,8 +4017,8 @@ cpdef _MutableFst shortestpath(_Fst ifst,
     delta: Comparison/quantization delta.
     nshortest: The number of paths to return.
     nstate: State number threshold.
-    qt: A string matching a known queue type; one of: "auto", "fifo", "lifo",
-        "shortest", "state", "top".
+    queue_type: A string matching a known queue type; one of: "auto", "fifo",
+        "lifo", "shortest", "state", "top".
     unique: Should the resulting FST only contain distinct paths? (Requires
         the input FST to be an acceptor; epsilons are treated as if they are
         regular symbols.)
@@ -4023,16 +4034,16 @@ cpdef _MutableFst shortestpath(_Fst ifst,
   # Threshold is set to semiring Zero (no pruning) if no weight is specified.
   cdef fst.WeightClass wc = _get_WeightClass_or_Zero(ifst.weight_type(), weight)
   cdef unique_ptr[fst.ShortestPathOptions] opts
-  opts.reset(new fst.ShortestPathOptions(_get_queue_type(tostring(qt)),
+  opts.reset(new fst.ShortestPathOptions(_get_queue_type(tostring(queue_type)),
                                          nshortest, unique, False, delta,
                                          False, wc, nstate))
   fst.ShortestPath(deref(ifst._fst), tfst, distance.get(), deref(opts))
   return _init_MutableFst(tfst)
 
 
-cpdef _Fst statemap(_Fst ifst, map_type=b"arc_sum"):
+cpdef _Fst statemap(_Fst ifst, map_type):
   """
-  state_map(ifst, map_type="arc_sum")
+  state_map(ifst, map_type)
 
   Constructively applies a transform to all states.
 
@@ -4042,7 +4053,8 @@ cpdef _Fst statemap(_Fst ifst, map_type=b"arc_sum"):
   Args:
     ifst: The input FST.
     map_type: A string matching a known mapping operation; one of: "arc_sum"
-       (sum weights of identically-labeled multi-arcs).
+        (sum weights of identically-labeled multi-arcs), "arc_unique" (deletes
+        non-unique identically-labeled multi-arcs).
 
   Returns:
     An FST with states remapped.
@@ -4052,7 +4064,7 @@ cpdef _Fst statemap(_Fst ifst, map_type=b"arc_sum"):
 
   See also: `arcmap`.
   """
-  return _map(ifst, fst.kDelta, map_type, weight=None)
+  return _map(ifst, fst.kDelta, map_type, None)
 
 
 cpdef _MutableFst synchronize(_Fst ifst):
@@ -4143,7 +4155,7 @@ cdef class Compiler(object):
                 bool keep_isymbols=False,
                 bool keep_osymbols=False,
                 bool keep_state_numbering=False,
-                allow_negative_labels=False):
+                bool allow_negative_labels=False):
     self._sstrm.reset(new stringstream())
     self._fst_type = tostring(fst_type)
     self._arc_type = tostring(arc_type)
@@ -4303,7 +4315,7 @@ cdef class FarReader(object):
     return self._reader.get().Error()
 
   cpdef string far_type(self):
-    return fst.FarTypeToString(self._reader.get().Type())
+    return fst.GetFarTypeString(self._reader.get().Type())
 
   cpdef bool find(self, key):
     """
@@ -4431,7 +4443,7 @@ cdef class FarWriter(object):
     Raises:
       FstIOError: Read failed.
     """
-    cdef fst.FarType ft = fst.FarTypeFromString(tostring(far_type))
+    cdef fst.FarType ft = fst.GetFarType(tostring(far_type))
     cdef fst.FarWriterClass *tfar = fst.FarWriterClass.Create(
         tostring(filename), tostring(arc_type), ft)
     if tfar == NULL:
@@ -4488,7 +4500,7 @@ cdef class FarWriter(object):
     return self._writer.get().Error()
 
   cpdef string far_type(self):
-    return fst.FarTypeToString(self._writer.get().Type())
+    return fst.GetFarTypeString(self._writer.get().Type())
 
   # Dictionary-like assignment.
   def __setitem__(self, key, _Fst fst):

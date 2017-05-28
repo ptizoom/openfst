@@ -11,13 +11,12 @@
 namespace fst {
 namespace script {
 
-typedef args::Package<MutableFstClass *, const FstClass &> UnionArgs;
+using UnionArgs = args::Package<MutableFstClass *, const FstClass &>;
 
 template <class Arc>
 void Union(UnionArgs *args) {
   MutableFst<Arc> *fst1 = args->arg1->GetMutableFst<Arc>();
   const Fst<Arc> &fst2 = *(args->arg2.GetFst<Arc>());
-
   Union(fst1, fst2);
 }
 

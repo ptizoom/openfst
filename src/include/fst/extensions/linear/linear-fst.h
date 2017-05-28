@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <fst/compat.h>
+#include <fst/log.h>
 #include <fst/extensions/pdt/collection.h>
 #include <fst/bi-table.h>
 #include <fst/cache.h>
@@ -28,6 +29,8 @@ namespace fst {
 // LinearTaggerFst and LinearClassifierFst.
 template <class F>
 class LinearFstMatcherTpl;
+
+namespace internal {
 
 // Implementation class for on-the-fly generated LinearTaggerFst with
 // special optimization in matching.
@@ -136,8 +139,8 @@ class LinearTaggerFstImpl : public CacheImpl<A> {
   // the input label.
   void MatchInput(StateId s, Label ilabel, std::vector<Arc> *arcs);
 
-  static LinearTaggerFstImpl<A> *Read(std::istream &strm,  // NOLINT
-                                      const FstReadOptions &opts);
+  static LinearTaggerFstImpl *Read(std::istream &strm,
+                                   const FstReadOptions &opts);
 
   bool Write(std::ostream &strm,  // NOLINT
              const FstWriteOptions &opts) const {
@@ -275,7 +278,7 @@ class LinearTaggerFstImpl : public CacheImpl<A> {
   // allocation
   std::vector<Label> state_stub_, next_stub_;
 
-  void operator=(const LinearTaggerFstImpl<A> &);  // Disallow assignment
+  LinearTaggerFstImpl &operator=(const LinearTaggerFstImpl &) = delete;
 };
 
 template <class A>
@@ -425,26 +428,26 @@ void LinearTaggerFstImpl<A>::MatchInput(StateId s, Label ilabel,
 template <class A>
 inline LinearTaggerFstImpl<A> *LinearTaggerFstImpl<A>::Read(
     std::istream &strm, const FstReadOptions &opts) {  // NOLINT
-  LinearTaggerFstImpl<A> *impl = new LinearTaggerFstImpl<A>();
+  std::unique_ptr<LinearTaggerFstImpl<A>> impl(new LinearTaggerFstImpl<A>());
   FstHeader header;
   if (!impl->ReadHeader(strm, opts, kMinFileVersion, &header)) {
-    delete impl;
     return nullptr;
   }
   impl->data_ = std::shared_ptr<LinearFstData<A>>(LinearFstData<A>::Read(strm));
   if (!impl->data_) {
-    delete impl;
     return nullptr;
   }
   impl->delay_ = impl->data_->MaxFutureSize();
   impl->ReserveStubSpace();
-  return impl;
+  return impl.release();
 }
+
+}  // namespace internal
 
 // This class attaches interface to implementation and handles
 // reference counting, delegating most methods to ImplToFst.
 template <class A>
-class LinearTaggerFst : public ImplToFst<LinearTaggerFstImpl<A>> {
+class LinearTaggerFst : public ImplToFst<internal::LinearTaggerFstImpl<A>> {
  public:
   friend class ArcIterator<LinearTaggerFst<A>>;
   friend class StateIterator<LinearTaggerFst<A>>;
@@ -456,7 +459,7 @@ class LinearTaggerFst : public ImplToFst<LinearTaggerFstImpl<A>> {
   typedef typename A::StateId StateId;
   typedef DefaultCacheStore<A> Store;
   typedef typename Store::State State;
-  typedef LinearTaggerFstImpl<A> Impl;
+  using Impl = internal::LinearTaggerFstImpl<A>;
 
   LinearTaggerFst() : ImplToFst<Impl>(std::make_shared<Impl>()) {}
 
@@ -506,7 +509,7 @@ class LinearTaggerFst : public ImplToFst<LinearTaggerFstImpl<A>> {
 
   static LinearTaggerFst<A> *Read(std::istream &in,  // NOLINT
                                   const FstReadOptions &opts) {
-    Impl *impl = Impl::Read(in, opts);
+    auto *impl = Impl::Read(in, opts);
     return impl ? new LinearTaggerFst<A>(std::shared_ptr<Impl>(impl)) : nullptr;
   }
 
@@ -535,39 +538,38 @@ class LinearTaggerFst : public ImplToFst<LinearTaggerFstImpl<A>> {
   explicit LinearTaggerFst(std::shared_ptr<Impl> impl)
       : ImplToFst<Impl>(impl) {}
 
-  void operator=(const LinearTaggerFst<A> &fst);  // Disallow assignment
+  void operator=(const LinearTaggerFst<A> &fst) = delete;
 };
 
 // Specialization for LinearTaggerFst.
-template <class A>
-class StateIterator<LinearTaggerFst<A>>
-    : public CacheStateIterator<LinearTaggerFst<A>> {
+template <class Arc>
+class StateIterator<LinearTaggerFst<Arc>>
+    : public CacheStateIterator<LinearTaggerFst<Arc>> {
  public:
-  explicit StateIterator(const LinearTaggerFst<A> &fst)
-      : CacheStateIterator<LinearTaggerFst<A>>(fst, fst.GetMutableImpl()) {}
+  explicit StateIterator(const LinearTaggerFst<Arc> &fst)
+      : CacheStateIterator<LinearTaggerFst<Arc>>(fst, fst.GetMutableImpl()) {}
 };
 
 // Specialization for LinearTaggerFst.
-template <class A>
-class ArcIterator<LinearTaggerFst<A>>
-    : public CacheArcIterator<LinearTaggerFst<A>> {
+template <class Arc>
+class ArcIterator<LinearTaggerFst<Arc>>
+    : public CacheArcIterator<LinearTaggerFst<Arc>> {
  public:
-  typedef typename A::StateId StateId;
+  using StateId = typename Arc::StateId;
 
-  ArcIterator(const LinearTaggerFst<A> &fst, StateId s)
-      : CacheArcIterator<LinearTaggerFst<A>>(fst.GetMutableImpl(), s) {
+  ArcIterator(const LinearTaggerFst<Arc> &fst, StateId s)
+      : CacheArcIterator<LinearTaggerFst<Arc>>(fst.GetMutableImpl(), s) {
     if (!fst.GetImpl()->HasArcs(s)) fst.GetMutableImpl()->Expand(s);
   }
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ArcIterator);
 };
 
-template <class A>
-inline void LinearTaggerFst<A>::InitStateIterator(
-    StateIteratorData<A> *data) const {
-  data->base = new StateIterator<LinearTaggerFst<A>>(*this);
+template <class Arc>
+inline void LinearTaggerFst<Arc>::InitStateIterator(
+    StateIteratorData<Arc> *data) const {
+  data->base = new StateIterator<LinearTaggerFst<Arc>>(*this);
 }
+
+namespace internal {
 
 // Implementation class for on-the-fly generated LinearClassifierFst with
 // special optimization in matching.
@@ -753,13 +755,14 @@ class LinearClassifierFstImpl : public CacheImpl<A> {
     Label pred = Prediction(state);
     DCHECK_GT(pred, 0);
     DCHECK_LE(pred, num_classes_);
-    Weight final = Weight::One();
+    Weight final_weight = Weight::One();
     for (size_t group = 0; group < num_groups_; ++group) {
       int group_id = GroupId(pred, group);
       int trie_state = InternalAt(state, group);
-      final = Times(final, data_->GroupFinalWeight(group_id, trie_state));
+      final_weight =
+          Times(final_weight, data_->GroupFinalWeight(group_id, trie_state));
     }
-    return final;
+    return final_weight;
   }
 
   // Finds state corresponding to an n-gram. Creates new state if n-gram not
@@ -792,7 +795,7 @@ class LinearClassifierFstImpl : public CacheImpl<A> {
   // allocation
   std::vector<Label> state_stub_, next_stub_;
 
-  void operator=(const LinearClassifierFstImpl<A> &);  // Disallow assignment
+  void operator=(const LinearClassifierFstImpl<A> &) = delete;
 };
 
 template <class A>
@@ -868,20 +871,18 @@ void LinearClassifierFstImpl<A>::MatchInput(StateId s, Label ilabel,
 template <class A>
 inline LinearClassifierFstImpl<A> *LinearClassifierFstImpl<A>::Read(
     std::istream &strm, const FstReadOptions &opts) {
-  LinearClassifierFstImpl<A> *impl = new LinearClassifierFstImpl<A>();
+  std::unique_ptr<LinearClassifierFstImpl<A>> impl(
+      new LinearClassifierFstImpl<A>());
   FstHeader header;
   if (!impl->ReadHeader(strm, opts, kMinFileVersion, &header)) {
-    delete impl;
     return nullptr;
   }
   impl->data_ = std::shared_ptr<LinearFstData<A>>(LinearFstData<A>::Read(strm));
   if (!impl->data_) {
-    delete impl;
     return nullptr;
   }
   ReadType(strm, &impl->num_classes_);
   if (!strm) {
-    delete impl;
     return nullptr;
   }
   impl->num_groups_ = impl->data_->NumGroups() / impl->num_classes_;
@@ -890,17 +891,19 @@ inline LinearClassifierFstImpl<A> *LinearClassifierFstImpl<A>::Read(
                   "number of classes: num groups = "
                << impl->data_->NumGroups()
                << ", num classes = " << impl->num_classes_;
-    delete impl;
     return nullptr;
   }
   impl->ReserveStubSpace();
-  return impl;
+  return impl.release();
 }
+
+}  // namespace internal
 
 // This class attaches interface to implementation and handles
 // reference counting, delegating most methods to ImplToFst.
 template <class A>
-class LinearClassifierFst : public ImplToFst<LinearClassifierFstImpl<A>> {
+class LinearClassifierFst
+    : public ImplToFst<internal::LinearClassifierFstImpl<A>> {
  public:
   friend class ArcIterator<LinearClassifierFst<A>>;
   friend class StateIterator<LinearClassifierFst<A>>;
@@ -912,7 +915,7 @@ class LinearClassifierFst : public ImplToFst<LinearClassifierFstImpl<A>> {
   typedef typename A::StateId StateId;
   typedef DefaultCacheStore<A> Store;
   typedef typename Store::State State;
-  typedef LinearClassifierFstImpl<A> Impl;
+  using Impl = internal::LinearClassifierFstImpl<A>;
 
   LinearClassifierFst() : ImplToFst<Impl>(std::make_shared<Impl>()) {}
 
@@ -964,7 +967,7 @@ class LinearClassifierFst : public ImplToFst<LinearClassifierFstImpl<A>> {
 
   static LinearClassifierFst<A> *Read(std::istream &in,
                                       const FstReadOptions &opts) {
-    Impl *impl = Impl::Read(in, opts);
+    auto *impl = Impl::Read(in, opts);
     return impl ? new LinearClassifierFst<A>(std::shared_ptr<Impl>(impl))
                 : nullptr;
   }
@@ -994,38 +997,36 @@ class LinearClassifierFst : public ImplToFst<LinearClassifierFstImpl<A>> {
   explicit LinearClassifierFst(std::shared_ptr<Impl> impl)
       : ImplToFst<Impl>(impl) {}
 
-  void operator=(const LinearClassifierFst<A> &fst);  // Disallow assignment
+  void operator=(const LinearClassifierFst<A> &fst) = delete;
 };
 
 // Specialization for LinearClassifierFst.
-template <class A>
-class StateIterator<LinearClassifierFst<A>>
-    : public CacheStateIterator<LinearClassifierFst<A>> {
+template <class Arc>
+class StateIterator<LinearClassifierFst<Arc>>
+    : public CacheStateIterator<LinearClassifierFst<Arc>> {
  public:
-  explicit StateIterator(const LinearClassifierFst<A> &fst)
-      : CacheStateIterator<LinearClassifierFst<A>>(fst, fst.GetMutableImpl()) {}
+  explicit StateIterator(const LinearClassifierFst<Arc> &fst)
+      : CacheStateIterator<LinearClassifierFst<Arc>>(fst,
+                                                     fst.GetMutableImpl()) {}
 };
 
 // Specialization for LinearClassifierFst.
-template <class A>
-class ArcIterator<LinearClassifierFst<A>>
-    : public CacheArcIterator<LinearClassifierFst<A>> {
+template <class Arc>
+class ArcIterator<LinearClassifierFst<Arc>>
+    : public CacheArcIterator<LinearClassifierFst<Arc>> {
  public:
-  typedef typename A::StateId StateId;
+  using StateId = typename Arc::StateId;
 
-  ArcIterator(const LinearClassifierFst<A> &fst, StateId s)
-      : CacheArcIterator<LinearClassifierFst<A>>(fst.GetMutableImpl(), s) {
+  ArcIterator(const LinearClassifierFst<Arc> &fst, StateId s)
+      : CacheArcIterator<LinearClassifierFst<Arc>>(fst.GetMutableImpl(), s) {
     if (!fst.GetImpl()->HasArcs(s)) fst.GetMutableImpl()->Expand(s);
   }
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ArcIterator);
 };
 
-template <class A>
-inline void LinearClassifierFst<A>::InitStateIterator(
-    StateIteratorData<A> *data) const {
-  data->base = new StateIterator<LinearClassifierFst<A>>(*this);
+template <class Arc>
+inline void LinearClassifierFst<Arc>::InitStateIterator(
+    StateIteratorData<Arc> *data) const {
+  data->base = new StateIterator<LinearClassifierFst<Arc>>(*this);
 }
 
 // Specialized Matcher for LinearFsts. This matcher only supports
@@ -1070,8 +1071,6 @@ class LinearFstMatcherTpl : public MatcherBase<typename F::Arc> {
         cur_arc_(0),
         error_(matcher.error_) {}
 
-  ~LinearFstMatcherTpl() override { delete fst_; }
-
   LinearFstMatcherTpl<F> *Copy(bool safe = false) const override {
     return new LinearFstMatcherTpl<F>(*this, safe);
   }
@@ -1081,7 +1080,7 @@ class LinearFstMatcherTpl : public MatcherBase<typename F::Arc> {
     return match_type_ == MATCH_INPUT ? match_type_ : MATCH_NONE;
   }
 
-  void SetState(StateId s) {
+  void SetState(StateId s) final {
     if (s_ == s) return;
     s_ = s;
     // `MATCH_INPUT` is the only valid type
@@ -1092,7 +1091,7 @@ class LinearFstMatcherTpl : public MatcherBase<typename F::Arc> {
     loop_.nextstate = s;
   }
 
-  bool Find(Label label) {
+  bool Find(Label label) final {
     if (error_) {
       current_loop_ = false;
       return false;
@@ -1105,18 +1104,22 @@ class LinearFstMatcherTpl : public MatcherBase<typename F::Arc> {
     return current_loop_ || !arcs_.empty();
   }
 
-  bool Done() const { return !(current_loop_ || cur_arc_ < arcs_.size()); }
+  bool Done() const final {
+    return !(current_loop_ || cur_arc_ < arcs_.size());
+  }
 
-  const Arc &Value() const { return current_loop_ ? loop_ : arcs_[cur_arc_]; }
+  const Arc &Value() const final {
+    return current_loop_ ? loop_ : arcs_[cur_arc_];
+  }
 
-  void Next() {
+  void Next() final {
     if (current_loop_)
       current_loop_ = false;
     else
       ++cur_arc_;
   }
 
-  ssize_t Priority_(StateId s) override { return kRequirePriority; }
+  ssize_t Priority(StateId s) final { return kRequirePriority; }
 
   const FST &GetFst() const override { return *fst_; }
 
@@ -1128,25 +1131,17 @@ class LinearFstMatcherTpl : public MatcherBase<typename F::Arc> {
   uint32 Flags() const override { return kRequireMatch; }
 
  private:
-  void SetState_(StateId s) override { SetState(s); }
-  bool Find_(Label label) override { return Find(label); }
-  bool Done_() const override { return Done(); }
-  const Arc &Value_() const override { return Value(); }
-  void Next_() override { Next(); }
-
-  const FST *fst_;
-  MatchType match_type_;  // Type of match to perform
-  StateId s_;             // Current state
-  bool current_loop_;     // Current arc is the implicit loop
-  Arc loop_;              // For non-consuming symbols
-  std::vector<Arc>
-      arcs_;          // All out-going arcs matching the label in last `Find()`
-                      // call
-  size_t cur_arc_;    // Index to the arc that `Value()` should return
-  bool error_;        // Error encountered
-
-  void operator=(const LinearFstMatcherTpl<F> &);  // Disallow assignment
+  std::unique_ptr<const FST> fst_;
+  MatchType match_type_;  // Type of match to perform.
+  StateId s_;             // Current state.
+  bool current_loop_;     // Current arc is the implicit loop.
+  Arc loop_;              // For non-consuming symbols.
+  // All out-going arcs matching the label in last Find() call.
+  std::vector<Arc> arcs_;
+  size_t cur_arc_;  // Index to the arc that `Value()` should return.
+  bool error_;      // Error encountered.
 };
+
 }  // namespace fst
 
 #endif  // FST_EXTENSIONS_LINEAR_LINEAR_FST_H_

@@ -3,15 +3,24 @@
 //
 // Reverses a PDT.
 
+#include <cstring>
+
+#include <memory>
+#include <string>
 #include <vector>
+
+#include <fst/log.h>
 
 #include <fst/extensions/pdt/pdtscript.h>
 #include <fst/util.h>
 
-DEFINE_string(pdt_parentheses, "", "PDT parenthesis label pairs.");
+DEFINE_string(pdt_parentheses, "", "PDT parenthesis label pairs");
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
+  using fst::ReadLabelPairs;
+  using fst::script::FstClass;
+  using fst::script::VectorFstClass;
 
   string usage = "Reverse a PDT.\n\n  Usage: ";
   usage += argv[0];
@@ -24,10 +33,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name =
+      (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
-  s::FstClass *ifst = s::FstClass::Read(in_name);
+  std::unique_ptr<FstClass> ifst(FstClass::Read(in_name));
   if (!ifst) return 1;
 
   if (FLAGS_pdt_parentheses.empty()) {
@@ -36,9 +46,10 @@ int main(int argc, char **argv) {
   }
 
   std::vector<s::LabelPair> parens;
-  fst::ReadLabelPairs(FLAGS_pdt_parentheses, &parens, false);
+  if (!ReadLabelPairs(FLAGS_pdt_parentheses, &parens, false)) return 1;
 
-  s::VectorFstClass ofst(ifst->ArcType());
+  VectorFstClass ofst(ifst->ArcType());
+
   s::PdtReverse(*ifst, parens, &ofst);
 
   ofst.Write(out_name);

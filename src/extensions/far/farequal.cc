@@ -3,8 +3,10 @@
 //
 // Tests if two Far files contains the same (key,fst) pairs.
 
+#include <string>
+
 #include <fst/extensions/far/farscript.h>
-#include <fst/extensions/far/main.h>
+#include <fst/extensions/far/getters.h>
 
 DEFINE_string(begin_key, "",
               "First key to extract (def: first key in archive)");
@@ -15,25 +17,23 @@ int main(int argc, char **argv) {
   namespace s = fst::script;
 
   string usage = "Compares the FSTs in two FST archives for equality.";
-  usage += "\n\n Usage:";
+  usage += "\n\n  Usage:";
   usage += argv[0];
-  usage += " in1.far in2.far\n";
-  usage += "  Flags: begin_key end_key";
+  usage += " in1.far in2.far";
 
   std::set_new_handler(FailedNewHandler);
   SET_FLAGS(usage.c_str(), &argc, &argv, true);
-  fst::ExpandArgs(argc, argv, &argc, &argv);
-
+  s::ExpandArgs(argc, argv, &argc, &argv);
   if (argc != 3) {
     ShowUsage();
     return 1;
   }
 
-  string filename1(argv[1]), filename2(argv[2]);
+  const auto arc_type = s::LoadArcTypeFromFar(argv[1]);
+  if (arc_type.empty()) return 1;
 
-  bool result =
-      s::FarEqual(filename1, filename2, fst::LoadArcTypeFromFar(filename1),
-                  FLAGS_delta, FLAGS_begin_key, FLAGS_end_key);
+  bool result = s::FarEqual(argv[1], argv[2], arc_type, FLAGS_delta,
+                            FLAGS_begin_key, FLAGS_end_key);
 
   if (!result) VLOG(1) << "FARs are not equal.";
 

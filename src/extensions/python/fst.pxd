@@ -153,7 +153,7 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
   # templated structs unless we pretend they are full-blown classes.
   cdef cppclass RandGenOptions[RandArcSelection]:
 
-    RandGenOptions(const RandArcSelection &, int32)
+    RandGenOptions(const RandArcSelection &, int32, int32, bool, bool)
 
 
   enum ReplaceLabelType:
@@ -168,6 +168,11 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
     REWEIGHT_TO_FINAL
 
 
+  cdef cppclass SymbolTableTextOptions:
+
+    SymbolTableTextOptions(bool)
+
+
   # Symbol tables.
   cdef cppclass SymbolTable:
 
@@ -179,7 +184,7 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
     SymbolTable *Read(const string &)
 
     @staticmethod
-    SymbolTable *ReadText(const string &)
+    SymbolTable *ReadText(const string &, const SymbolTableTextOptions &)
 
     int64 AddSymbol(const string &, int64)
 
@@ -187,11 +192,17 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
 
     SymbolTable *Copy()
 
-    # Aliased so the compiler can sort this out.
+    # Aliased so the Cython transpiler can sort out the overloading.
 
     string FindSymbol "Find"(int64)
 
-    int64 FindLabel "Find"(string)
+    int64 FindIndex "Find"(string)
+
+    # Aliased so the Cython transpiler can sort out the overloading.
+
+    bool MemberSymbol "Member"(string)
+
+    bool MemberIndex "Member"(int64)
 
     void AddTable(const SymbolTable &)
 
@@ -293,6 +304,9 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     @staticmethod
     FstClass *Read(const string &)
 
+    @staticmethod
+    FstClass *ReadFromString(const string &)
+
     int64 Start()
 
     WeightClass Final(int64)
@@ -314,6 +328,8 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     const string &WeightType()
 
     bool Write(const string &)
+
+    const string WriteToString()
 
     uint64 Properties(uint64, bool)
 
@@ -461,10 +477,12 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     OUTPUT_EPSILON_ARC_FILTER
 
   enum ArcSortType:
-    ILABEL_COMPARE
-    OLABEL_COMPARE
+    ILABEL_SORT
+    OLABEL_SORT
 
   cdef void ArcSort(MutableFstClass *, ArcSortType)
+
+  cdef ClosureType GetClosureType(bool)
 
   cdef void Closure(MutableFstClass *, ClosureType)
 
@@ -473,7 +491,6 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
                                     const SymbolTable *, const SymbolTable *,
                                     const SymbolTable*, bool, bool, bool, bool,
                                     bool)
-
   cdef cppclass ComposeOptions:
 
     ComposeOptions(bool, ComposeFilter)
@@ -510,9 +527,11 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
   cdef void DrawFst(const FstClass &fst, const SymbolTable *,
                     const SymbolTable *, const SymbolTable *, bool,
                     const string &, float, float, bool, bool, float, float, int,
-                    int, bool, ostream *, const string &)
+                    int, const string &, bool, ostream *, const string &)
 
   cdef void Encode(MutableFstClass *, EncodeMapperClass *)
+
+  cdef EpsNormalizeType GetEpsNormalizeType(bool)
 
   cdef void EpsNormalize(const FstClass &, MutableFstClass *, EpsNormalizeType)
 
@@ -525,8 +544,7 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
   cdef void Invert(MutableFstClass *fst)
 
-  cdef bool Isomorphic(const FstClass &, const FstClass &, float, bool *)
-
+  cdef bool Isomorphic(const FstClass &, const FstClass &, float)
 
   enum MapType:
     ARC_SUM_MAPPER
@@ -543,10 +561,11 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     TO_LOG64_MAPPER
     TO_STD_MAPPER
 
-
   cdef FstClass *Map(const FstClass &, MapType, float, const WeightClass &)
 
-  cdef void Minimize(MutableFstClass *, MutableFstClass *, float)
+  cdef void Minimize(MutableFstClass *, MutableFstClass *, float, bool)
+
+  cdef ProjectType GetProjectType(bool)
 
   cdef void Project(MutableFstClass *, ProjectType)
 
@@ -564,28 +583,24 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
   cdef void Push(MutableFstClass *, ReweightType, float, bool)
 
-
   enum RandArcSelection:
     UNIFORM_ARC_SELECTOR
     LOG_PROB_ARC_SELECTOR
     FAST_LOG_PROB_ARC_SELECTOR
 
-
-  cdef bool RandEquivalent(const FstClass &, const FstClass &, time_t, int32,
-                           float, const RandGenOptions[RandArcSelection] &,
+  cdef bool RandEquivalent(const FstClass &, const FstClass &, int32, float,
+                           time_t, const RandGenOptions[RandArcSelection] &,
                            bool *)
 
   cdef void RandGen(const FstClass &, MutableFstClass *, time_t,
                     const RandGenOptions[RandArcSelection] &)
 
   cdef void Relabel(MutableFstClass *,
-      const SymbolTable *, const SymbolTable *, bool,
-      const SymbolTable *, const SymbolTable *, bool)
+      const SymbolTable *, const SymbolTable *, const string &, bool,
+      const SymbolTable *, const SymbolTable *, const string &, bool)
 
   cdef void Relabel(MutableFstClass *, const vector[LabelPair] &,
                     const vector[LabelPair] &)
-
-  cdef void Relabel(MutableFstClass *, const SymbolTable *, const SymbolTable *)
 
   cdef cppclass ReplaceOptions:
 
@@ -636,6 +651,29 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
   cdef bool Verify(const FstClass &)
 
 
+cdef extern from "nlp/fst/script/getters.h" namespace "fst::script" nogil:
+
+  cdef bool GetArcSortType(const string &, ArcSortType *)
+
+  cdef bool GetComposeFilter(const string &, ComposeFilter *)
+
+  cdef bool GetDeterminizeType(const string &, DeterminizeType *)
+
+  cdef uint32 GetEncodeFlags(bool, bool)
+
+  cdef bool GetMapType(const string &, MapType *)
+
+  cdef uint32 GetPushFlags(bool, bool, bool, bool)
+
+  cdef bool GetQueueType(const string &, QueueType *)
+
+  cdef bool GetRandArcSelection(const string &, RandArcSelection *)
+
+  cdef bool GetReplaceLabelType(string, bool, ReplaceLabelType *)
+
+  cdef ReweightType GetReweightType(bool)
+
+
 cdef extern from "<fst/extensions/far/far.h>" namespace "fst" nogil:
 
   enum FarType:
@@ -645,12 +683,16 @@ cdef extern from "<fst/extensions/far/far.h>" namespace "fst" nogil:
     FAR_FST
     FAR_SSTABLE
 
+cdef extern from "<fst/extensions/far/getters.h>" \
+    namespace "fst" nogil:
 
-cdef extern from "<fst/extensions/far/main.h>" namespace "fst" nogil:
+  string GetFarTypeString(FarType)
 
-  FarType FarTypeFromString(const string &)
 
-  string FarTypeToString(FarType)
+cdef extern from "<fst/extensions/far/getters.h>" \
+    namespace "fst::script" nogil:
+
+  FarType GetFarType(const string &)
 
 
 cdef extern from "<fst/extensions/far/far-class.h>" \

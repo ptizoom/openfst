@@ -16,22 +16,26 @@ namespace fst {
 namespace script {
 
 // 1
-typedef args::Package<MutableFstClass *, const SymbolTable *,
-                      const SymbolTable *, bool, const SymbolTable *,
-                      const SymbolTable *, bool> RelabelArgs1;
+using RelabelArgs1 =
+    args::Package<MutableFstClass *,
+                  const SymbolTable *, const SymbolTable *,
+                  const string &, bool,
+                  const SymbolTable *, const SymbolTable *,
+                  const string &, bool>;
 
 template <class Arc>
 void Relabel(RelabelArgs1 *args) {
   MutableFst<Arc> *ofst = args->arg1->GetMutableFst<Arc>();
   Relabel(ofst, args->arg2, args->arg3, args->arg4, args->arg5, args->arg6,
-          args->arg7);
+          args->arg7, args->arg8, args->arg9);
 }
 
 using LabelPair = std::pair<int64, int64>;
 
 // 2
-typedef args::Package<MutableFstClass *, const std::vector<LabelPair> &,
-                      const std::vector<LabelPair> &> RelabelArgs2;
+using RelabelArgs2 =
+    args::Package<MutableFstClass *, const std::vector<LabelPair> &,
+                  const std::vector<LabelPair> &>;
 
 template <class Arc>
 void Relabel(RelabelArgs2 *args) {
@@ -47,8 +51,8 @@ void Relabel(RelabelArgs2 *args) {
 }
 
 // 3
-typedef args::Package<MutableFstClass *, const SymbolTable *,
-                      const SymbolTable *> RelabelArgs3;
+using RelabelArgs3 =
+    args::Package<MutableFstClass *, const SymbolTable *, const SymbolTable *>;
 template <class Arc>
 void Relabel(args::Package<MutableFstClass *, const SymbolTable *,
                            const SymbolTable *> *args) {
@@ -57,10 +61,11 @@ void Relabel(args::Package<MutableFstClass *, const SymbolTable *,
 }
 
 // 1
-void Relabel(MutableFstClass *ofst, const SymbolTable *old_isymbols,
-             const SymbolTable *new_isymbols, bool attach_new_isymbols,
+void Relabel(MutableFstClass *ofst,
+             const SymbolTable *old_isymbols, const SymbolTable *new_isymbols,
+             const string &unknown_isymbol,  bool attach_new_isymbols,
              const SymbolTable *old_osymbols, const SymbolTable *new_osymbols,
-             bool attach_new_osymbols);
+             const string &unknown_osymbol, bool attach_new_osymbols);
 
 // 2
 void Relabel(MutableFstClass *ofst, const std::vector<LabelPair> &ipairs,

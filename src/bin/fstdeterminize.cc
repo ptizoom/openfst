@@ -3,9 +3,13 @@
 //
 // Determinizes an FST.
 
+#include <cstring>
+
 #include <memory>
+#include <string>
 
 #include <fst/script/determinize.h>
+#include <fst/script/getters.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
 DEFINE_string(weight, "", "Weight threshold");
@@ -22,8 +26,8 @@ DEFINE_bool(increment_subsequential_label, false,
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
+  using fst::DeterminizeType;
   using fst::script::FstClass;
-  using fst::script::MutableFstClass;
   using fst::script::VectorFstClass;
   using fst::script::WeightClass;
 
@@ -38,33 +42,28 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  fst::DeterminizeType det_type;
-  if (FLAGS_det_type.empty() || FLAGS_det_type[0] == 'f') {
-    det_type = fst::DETERMINIZE_FUNCTIONAL;
-  } else if (FLAGS_det_type[0] == 'n') {
-    det_type = fst::DETERMINIZE_NONFUNCTIONAL;
-  } else if (FLAGS_det_type[0] == 'd') {
-    det_type = fst::DETERMINIZE_DISAMBIGUATE;
-  } else {
-    LOG(ERROR) << argv[0] << ": Unknown determinize type: " << FLAGS_det_type;
+  DeterminizeType det_type;
+  if (!s::GetDeterminizeType(FLAGS_det_type, &det_type)) {
+    LOG(ERROR) << argv[0] << ": Unknown or unsupported determinization type: "
+                          << FLAGS_det_type;
     return 1;
   }
 
-  string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<FstClass> ifst(FstClass::Read(in_name));
   if (!ifst) return 1;
 
   VectorFstClass ofst(ifst->ArcType());
 
-  const WeightClass weight_threshold =
+  const auto weight_threshold =
       FLAGS_weight.empty() ? WeightClass::Zero(ifst->WeightType())
                            : WeightClass(ifst->WeightType(), FLAGS_weight);
 
-  s::DeterminizeOptions opts(FLAGS_delta, weight_threshold, FLAGS_nstate,
-                             FLAGS_subsequential_label, det_type,
-                             FLAGS_increment_subsequential_label);
+  const s::DeterminizeOptions opts(FLAGS_delta, weight_threshold, FLAGS_nstate,
+                                   FLAGS_subsequential_label, det_type,
+                                   FLAGS_increment_subsequential_label);
 
   s::Determinize(*ifst, &ofst, opts);
 

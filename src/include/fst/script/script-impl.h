@@ -28,8 +28,7 @@
 //     a single struct. The template structs in arg-packs.h provide a handy
 //     way to do this. In Foo's case, that might look like this:
 //
-//       typedef args::Package<const FstClass &,
-//                             MutableFstClass *> FooArgs;
+//       using FooArgs = args::Package<const FstClass &, MutableFstClass *>;
 //
 //     Note: this package of args is going to be passed by non-const pointer.
 //
@@ -38,11 +37,10 @@
 //
 //       template<class Arc>
 //       void Foo(FooArgs *args) {
-//          // Pull out the actual, arc-templated FSTs
+//          // Pulls out the actual, arc-templated FSTs.
 //          const Fst<Arc> &ifst = args->arg1.GetFst<Arc>();
 //          MutableFst<Arc> *ofst = args->arg2->GetMutableFst<Arc>();
-//
-//          // actually perform foo on ifst and ofst...
+//          // Actually perform Foo on ifst and ofst.
 //       }
 //
 //  3) a client-facing function for your operation. This would look like
@@ -90,16 +88,21 @@
 #include <fst/script/fst-class.h>
 
 #include <fst/types.h>
+#include <fst/log.h>
 
 namespace fst {
 namespace script {
 
-//
+enum RandArcSelection {
+  UNIFORM_ARC_SELECTOR,
+  LOG_PROB_ARC_SELECTOR,
+  FAST_LOG_PROB_ARC_SELECTOR
+};
+
 // A generic register for operations with various kinds of signatures.
 // Needed since every function signature requires a new registration class.
 // The std::pair<string, string> is understood to be the operation name and arc
 // type; subclasses (or typedefs) need only provide the operation signature.
-//
 
 template <class OperationSignature>
 class GenericOperationRegister
@@ -118,33 +121,32 @@ class GenericOperationRegister
 
  protected:
   string ConvertKeyToSoFilename(
-      const std::pair<string, string> &key) const override {
-    // Just use the old-style FST for now.
-    string legal_type(key.second);  // the arc type
+      const std::pair<string, string> &key) const final {
+    // Uses the old-style FST for now.
+    string legal_type(key.second);  // The arc type.
     ConvertToLegalCSymbol(&legal_type);
-
     return legal_type + "-arc.so";
   }
 };
 
-// Operation package - everything you need to register a new type of operation
+// Operation package: everything you need to register a new type of operation.
+// The ArgPack should be the type that's passed into each wrapped function;
+// for instance, it might be a struct containing all the args. It's always
+// passed by pointer, so const members should be used to enforce constness where
+// it's needed. Return values should be implemented as a member of ArgPack as
+// well.
 
-// The ArgPack should be the type that's passed into each wrapped function -
-// for instance, it might be a struct containing all the args.
-// It's always passed by pointer, so const members should be used to enforce
-// constness where it's needed. Return values should be implemented as a
-// member of ArgPack as well.
-
-template <class ArgPack>
+template <class Args>
 struct Operation {
-  typedef ArgPack Args;
-  typedef void (*OpType)(ArgPack *args);
+  using ArgPack = Args;
 
-  // The register (hash) type
-  typedef GenericOperationRegister<OpType> Register;
+  using OpType = void (*)(ArgPack *args);
+
+  // The register (hash) type.
+  using Register = GenericOperationRegister<OpType>;
 
   // The register-er type
-  typedef GenericRegisterer<Register> Registerer;
+  using Registerer = GenericRegisterer<Register>;
 };
 
 // Macro for registering new types of operations.
@@ -154,11 +156,11 @@ struct Operation {
       arc_dispatched_operation_##ArgPack##Op##Arc##_registerer \
       (std::make_pair(#Op, Arc::Type()), Op<Arc>)
 
-// Template function to apply an operation by name
+// Template function to apply an operation by name.
 
 template <class OpReg>
 void Apply(const string &op_name, const string &arc_type,
-           typename OpReg::Args *args) {
+           typename OpReg::ArgPack *args) {
   typename OpReg::Register *reg = OpReg::Register::GetRegister();
   typename OpReg::OpType op = reg->GetOperation(op_name, arc_type);
   if (!op) {
@@ -169,9 +171,17 @@ void Apply(const string &op_name, const string &arc_type,
   op(args);
 }
 
-// Helper that logs to ERROR if the arc types of a and b don't match. The
-// op_name is also printed.
-bool ArcTypesMatch(const FstClass &a, const FstClass &b, const string &op_name);
+// Helper that logs to ERROR if the arc types of m and n don't match. The
+// op_name is used to construct the error message.
+template <class M, class N>
+bool ArcTypesMatch(const M &m, const N &n, const string &op_name) {
+  if (m.ArcType() != n.ArcType()) {
+    FSTERROR() << "Arguments with non-matching arc types passed to "
+               << op_name << ":\t" << m.ArcType() << " and " << n.ArcType();
+    return false;
+  }
+  return true;
+}
 
 }  // namespace script
 }  // namespace fst

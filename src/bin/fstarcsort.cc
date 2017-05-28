@@ -3,18 +3,21 @@
 //
 // Sorts arcs of an FST.
 
+#include <cstring>
+
 #include <memory>
 #include <string>
 
 #include <fst/compat.h>
+#include <fst/log.h>
 #include <fst/script/arcsort.h>
+#include <fst/script/getters.h>
 
 DEFINE_string(sort_type, "ilabel",
               "Comparison method, one of: \"ilabel\", \"olabel\"");
 
 int main(int argc, char **argv) {
   namespace s = fst::script;
-  using fst::script::FstClass;
   using fst::script::MutableFstClass;
 
   string usage = "Sorts arcs of an FST.\n\n  Usage: ";
@@ -29,19 +32,17 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name =
+      (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<MutableFstClass> fst(MutableFstClass::Read(in_name, true));
   if (!fst) return 1;
 
   s::ArcSortType sort_type;
-  if (FLAGS_sort_type == "ilabel") {
-    sort_type = fst::script::ILABEL_COMPARE;
-  } else if (FLAGS_sort_type == "olabel") {
-    sort_type = fst::script::OLABEL_COMPARE;
-  } else {
-    LOG(ERROR) << argv[0] << ": Unknown sort type \"" << FLAGS_sort_type;
+  if (!s::GetArcSortType(FLAGS_sort_type, &sort_type)) {
+    LOG(ERROR) << argv[0] << ": Unknown or unsupported sort type: "
+               << FLAGS_sort_type;
     return 1;
   }
 
