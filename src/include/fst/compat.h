@@ -84,10 +84,7 @@ class CheckSummer {
   }
 
   void Update(string const &data) {
-      //TODO:PTZ180426 we are loosing 1 bit,  (2^32 - 1) elements !
-      //for the sign instead of 1 element  
-
-      for (int i = 0; i < (ssize_t) data.size(); ++i) {
+    for (unsigned int i = 0; i < data.size(); ++i)
       check_sum_[(count_++) % kCheckSumLength] ^= data[i];
     }
   }

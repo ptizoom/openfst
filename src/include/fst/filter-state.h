@@ -47,8 +47,7 @@ namespace fst {
 template <typename T>
 class IntegerFilterState {
  public:
-  IntegerFilterState() : state_(kNoStateId) {}
-
+  IntegerFilterState() : state_(static_cast< T >(kNoStateId)) {}
   explicit IntegerFilterState(T s) : state_(s) {}
 
   static const IntegerFilterState NoState() { return IntegerFilterState(); }

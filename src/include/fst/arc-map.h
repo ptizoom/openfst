@@ -181,7 +181,7 @@ template <class A, class B, class C>
 void ArcMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
   using FromArc = A;
   using StateId = typename FromArc::StateId;
-  //PTZ180426 not used? using Weight = typename FromArc::Weight;
+  //PTZ180426 not used? using Weight = ATTRIBUTE_UNUSED typename FromArc::Weight;
   ofst->DeleteStates();
   if (mapper->InputSymbolsAction() == MAP_COPY_SYMBOLS) {
     ofst->SetInputSymbols(ifst.InputSymbols());

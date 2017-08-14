@@ -30,7 +30,7 @@ namespace fst {
 // where V is the number of states.
 template <class Arc>
 void Closure(MutableFst<Arc> *fst, ClosureType closure_type) {
-  //PTZ180426 not used? using Label = typename Arc::Label;
+  //PTZ180426 not used? using Label = typename Arc::Label ATTRIBUTE_UNUSED;
   //PTZ180426 not used? using StateId = typename Arc::StateId;
   using Weight = typename Arc::Weight;
   const auto props = fst->Properties(kFstProperties, false);

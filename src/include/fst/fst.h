@@ -18,6 +18,12 @@
 #include <string>
 #include <utility>
 
+#if defined(__GNUC__)
+#define ATTRIBUTE_UNUSED __attribute__ ((unused))
+#else
+#define ATTRIBUTE_UNUSED
+#endif
+
 #include <fst/compat.h>
 #include <fst/flags.h>
 #include <fst/log.h>
@@ -623,6 +629,19 @@ template <class Arc>
 inline size_t NumOutputEpsilons(const Fst<Arc> &fst, typename Arc::StateId s) {
   return fst.NumOutputEpsilons(s);
 }
+#if 0
+//PTZ180525
+// A useful alias when using StdArc.
+typedef Fst<StdArc> StdFst;
+
+//
+//  CONSTANT DEFINITIONS
+//
+
+const size_t kNoStateId = UINT_MAX;  // Not a valid state ID
+const int kNoLabel = -1;    // Not a valid label
+
+#endif
 
 // FST implementation base.
 //

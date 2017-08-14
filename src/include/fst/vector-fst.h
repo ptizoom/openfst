@@ -139,7 +139,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
   VectorFstBaseImpl() : start_(kNoStateId) {}
 
   ~VectorFstBaseImpl() override {
-    for (StateId s = 0; s < states_.size(); ++s) {
+      for (StateId s = 0; (size_t)s < states_.size(); ++s)
       State::Destroy(states_[s], &state_alloc_);
     }
   }
@@ -531,7 +531,7 @@ bool VectorFst<Arc, State>::WriteFst(const FST &fst, std::ostream &strm,
   hdr.SetNumStates(kNoStateId);
   size_t start_offset = 0;
   if (fst.Properties(kExpanded, false) || opts.stream_write ||
-      (start_offset = strm.tellp()) != -1) {
+      (start_offset = strm.tellp()) != kNoStateId) {
     hdr.SetNumStates(CountStates(fst));
     update_header = false;
   }
@@ -565,7 +565,7 @@ bool VectorFst<Arc, State>::WriteFst(const FST &fst, std::ostream &strm,
         fst, strm, opts, file_version, "vector", properties, &hdr,
         start_offset);
   } else {
-    if (num_states != hdr.NumStates()) {
+      if (num_states != static_cast< StateId >(hdr.NumStates())) {
       LOG(ERROR) << "Inconsistent number of states observed during write";
       return false;
     }

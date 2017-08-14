@@ -30,7 +30,7 @@ namespace fst {
 // FST.
 template <class Arc>
 void Concat(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
-   //PTZ180426 not used? using Label = typename Arc::Label;
+   //PTZ180426 not used? using Label = typename Arc::Label ATTRIBUTE_UNUSED;
   using StateId = typename Arc::StateId;
   using Weight = typename Arc::Weight;
   // Checks that the symbol table are compatible.
