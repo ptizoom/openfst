@@ -15823,9 +15823,9 @@ fi
 	#
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for a version of Python >= '2.1.0'" >&5
 $as_echo_n "checking for a version of Python >= '2.1.0'... " >&6; }
-	ac_supports_python_ver=`$PYTHON -c "import sys, string; \
-		ver = string.split(sys.version)[0]; \
-		print ver >= '2.1.0'"`
+	ac_supports_python_ver=`$PYTHON -c "import sys; \
+		ver = sys.version.split()[0]; \
+		print (ver >= '2.1.0')"`
 	if test "$ac_supports_python_ver" != "True"; then
 		if test -z "$PYTHON_NOVERSIONCHECK"; then
 			{ $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
@@ -15857,9 +15857,9 @@ $as_echo "yes" >&6; }
 	if test -n ">= '2.7'"; then
 		{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for a version of Python >= '2.7'" >&5
 $as_echo_n "checking for a version of Python >= '2.7'... " >&6; }
-		ac_supports_python_ver=`$PYTHON -c "import sys, string; \
-			ver = string.split(sys.version)[0]; \
-			print ver >= '2.7'"`
+		ac_supports_python_ver=`$PYTHON -c "import sys; \
+			ver = sys.version.split()[0]; \
+			print (ver >= '2.7')"`
 		if test "$ac_supports_python_ver" = "True"; then
 	   	   { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
 $as_echo "yes" >&6; }
@@ -15900,7 +15900,7 @@ $ac_distutils_result" "$LINENO" 5
 $as_echo_n "checking for Python include path... " >&6; }
 	if test -z "$PYTHON_CPPFLAGS"; then
 		python_path=`$PYTHON -c "import distutils.sysconfig; \
-           		print distutils.sysconfig.get_python_inc();"`
+           		print (distutils.sysconfig.get_python_inc());"`
 		if test -n "${python_path}"; then
 		   	python_path="-I$python_path"
 		fi
@@ -15919,21 +15919,19 @@ $as_echo_n "checking for Python library path... " >&6; }
 		# (makes two attempts to ensure we've got a version number
 		# from the interpreter)
 		py_version=`$PYTHON -c "from distutils.sysconfig import *; \
-			from string import join; \
-			print join(get_config_vars('VERSION'))"`
+			print (' '.join(get_config_vars('VERSION')))"`
 		if test "$py_version" == "None"; then
 			if test -n "$PYTHON_VERSION"; then
 				py_version=$PYTHON_VERSION
 			else
 				py_version=`$PYTHON -c "import sys; \
-					print sys.version[:3]"`
+					print(sys.version[:3])"`
 			fi
 		fi
 
 		PYTHON_LDFLAGS=`$PYTHON -c "from distutils.sysconfig import *; \
-			from string import join; \
-			print '-L' + get_python_lib(0,1), \
-		      	'-lpython';"`$py_version
+			print('-L' + get_python_lib(0,1), \
+		      	'-lpython');"`$py_version
 	fi
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON_LDFLAGS" >&5
 $as_echo "$PYTHON_LDFLAGS" >&6; }
@@ -15946,7 +15944,7 @@ $as_echo "$PYTHON_LDFLAGS" >&6; }
 $as_echo_n "checking for Python site-packages path... " >&6; }
 	if test -z "$PYTHON_SITE_PKG"; then
 		PYTHON_SITE_PKG=`$PYTHON -c "import distutils.sysconfig; \
-		        print distutils.sysconfig.get_python_lib(0,0);"`
+		        print(distutils.sysconfig.get_python_lib(0,0));"`
 	fi
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON_SITE_PKG" >&5
 $as_echo "$PYTHON_SITE_PKG" >&6; }
@@ -15960,7 +15958,7 @@ $as_echo_n "checking python extra libraries... " >&6; }
 	if test -z "$PYTHON_EXTRA_LIBS"; then
 	   PYTHON_EXTRA_LIBS=`$PYTHON -c "import distutils.sysconfig; \
                 conf = distutils.sysconfig.get_config_var; \
-                print conf('LOCALMODLIBS'), conf('LIBS')"`
+                print(conf('LOCALMODLIBS'), conf('LIBS'))"`
 	fi
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON_EXTRA_LIBS" >&5
 $as_echo "$PYTHON_EXTRA_LIBS" >&6; }
@@ -15974,7 +15972,7 @@ $as_echo_n "checking python extra linking flags... " >&6; }
 	if test -z "$PYTHON_EXTRA_LDFLAGS"; then
 		PYTHON_EXTRA_LDFLAGS=`$PYTHON -c "import distutils.sysconfig; \
 			conf = distutils.sysconfig.get_config_var; \
-			print conf('LINKFORSHARED')"`
+			print(conf('LINKFORSHARED'))"`
 	fi
 	{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $PYTHON_EXTRA_LDFLAGS" >&5
 $as_echo "$PYTHON_EXTRA_LDFLAGS" >&6; }
