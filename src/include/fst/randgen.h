@@ -705,8 +705,8 @@ void RandGen(const Fst<IArc> &ifst, MutableFst<OArc> *ofst,
              const RandGenOptions<Selector> &opts) {
   typedef ArcSampler<IArc, Selector> Sampler;
   typedef RandGenFst<IArc, OArc, Sampler> RandFst;
-  typedef typename OArc::StateId StateId;
-  typedef typename OArc::Weight Weight;
+  typedef typename OArc::StateId StateId ATTRIBUTE_UNUSED;
+  typedef typename OArc::Weight Weight ATTRIBUTE_UNUSED;
 
   Sampler *arc_sampler = new Sampler(ifst, opts.arc_selector, opts.max_length);
   RandGenFstOptions<Sampler> fopts(CacheOptions(true, 0), arc_sampler,

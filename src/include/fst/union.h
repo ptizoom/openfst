@@ -27,7 +27,7 @@ namespace fst {
 template <class Arc>
 void Union(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
   typedef typename Arc::Weight Weight;
 
   // Check that the symbol tables are compatible

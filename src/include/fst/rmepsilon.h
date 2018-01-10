@@ -205,7 +205,7 @@ void RmEpsilon(MutableFst<Arc> *fst,
                const RmEpsilonOptions<Arc, Queue> &opts) {
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Weight Weight;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
 
   if (fst->Start() == kNoStateId) {
     return;
@@ -325,7 +325,7 @@ void RmEpsilon(MutableFst<Arc> *fst, bool connect = true,
                float delta = kDelta) {
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Weight Weight;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
 
   std::vector<Weight> distance;
   AutoQueue<StateId> state_queue(*fst, &distance, EpsilonArcFilter<Arc>());

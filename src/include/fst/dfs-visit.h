@@ -124,7 +124,7 @@ void DfsVisit(const F &fst, V *visitor, ArcFilter filter,
     while (!state_stack.empty()) {
       DfsState<F> *dfs_state = state_stack.top();
       StateId s = dfs_state->state_id;
-      if (s >= state_color.size()) {
+      if (s >= 0 && (size_t)s >= state_color.size()) {
         nstates = s + 1;
         state_color.resize(nstates, kDfsWhite);
       }
@@ -145,7 +145,7 @@ void DfsVisit(const F &fst, V *visitor, ArcFilter filter,
         continue;
       }
       const Arc &arc = aiter.Value();
-      if (arc.nextstate >= state_color.size()) {
+      if (arc.nextstate >= 0 && (size_t)arc.nextstate >= state_color.size()) {
         nstates = arc.nextstate + 1;
         state_color.resize(nstates, kDfsWhite);
       }

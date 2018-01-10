@@ -1054,7 +1054,7 @@ template <class Arc>
 void Determinize(
     const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
     const DeterminizeOptions<Arc> &opts = DeterminizeOptions<Arc>()) {
-  typedef typename Arc::StateId StateId;
+  typedef typename Arc::StateId StateId ATTRIBUTE_UNUSED;
   typedef typename Arc::Weight Weight;
 
   DeterminizeFstOptions<Arc> nopts;

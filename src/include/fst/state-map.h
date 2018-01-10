@@ -72,7 +72,7 @@ namespace fst {
 template <class A, class C>
 void StateMap(MutableFst<A> *fst, C *mapper) {
   typedef typename A::StateId StateId;
-  typedef typename A::Weight Weight;
+  typedef typename A::Weight Weight ATTRIBUTE_UNUSED;
 
   if (mapper->InputSymbolsAction() == MAP_CLEAR_SYMBOLS)
     fst->SetInputSymbols(0);
@@ -109,7 +109,7 @@ void StateMap(MutableFst<A> *fst, C mapper) {
 template <class A, class B, class C>
 void StateMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
   typedef typename A::StateId StateId;
-  typedef typename A::Weight Weight;
+  typedef typename A::Weight Weight ATTRIBUTE_UNUSED;
 
   ofst->DeleteStates();
 

@@ -114,7 +114,7 @@ void Relabel(MutableFst<A>* fst, const SymbolTable* old_isymbols,
              const SymbolTable* new_isymbols, bool attach_new_isymbols,
              const SymbolTable* old_osymbols, const SymbolTable* new_osymbols,
              bool attach_new_osymbols) {
-  typedef typename A::StateId StateId;
+  typedef typename A::StateId StateId ATTRIBUTE_UNUSED;
   typedef typename A::Label Label;
 
   std::vector<std::pair<Label, Label>> ipairs;

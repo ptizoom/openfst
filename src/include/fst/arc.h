@@ -26,7 +26,7 @@ class ArcTpl {
  public:
   typedef W Weight;
   typedef int Label;
-  typedef int StateId;
+  typedef size_t StateId;
 
   ArcTpl(Label i, Label o, const Weight &w, StateId s)
       : ilabel(i), olabel(o), weight(w), nextstate(s) {}
@@ -58,7 +58,7 @@ class StringArc {
  public:
   typedef int Label;
   typedef StringWeight<int, S> Weight;
-  typedef int StateId;
+  typedef size_t StateId;
 
   StringArc(Label i, Label o, Weight w, StateId s)
       : ilabel(i), olabel(o), weight(w), nextstate(s) {}
@@ -148,7 +148,7 @@ template <class W1, class W2>
 struct LexicographicArc {
   typedef int Label;
   typedef LexicographicWeight<W1, W2> Weight;
-  typedef int StateId;
+  typedef size_t StateId;
 
   LexicographicArc(Label i, Label o, Weight w, StateId s)
       : ilabel(i), olabel(o), weight(w), nextstate(s) {}
@@ -171,7 +171,7 @@ template <class W1, class W2>
 struct ProductArc {
   typedef int Label;
   typedef ProductWeight<W1, W2> Weight;
-  typedef int StateId;
+  typedef size_t StateId;
 
   ProductArc(Label i, Label o, Weight w, StateId s)
       : ilabel(i), olabel(o), weight(w), nextstate(s) {}

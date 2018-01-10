@@ -263,7 +263,7 @@ void ShortestDistance(const Fst<Arc> &fst,
                       std::vector<typename Arc::Weight> *distance,
                       bool reverse = false, float delta = kDelta) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Weight Weight;
+  typedef typename Arc::Weight Weight ATTRIBUTE_UNUSED;
 
   if (!reverse) {
     AnyArcFilter<Arc> arc_filter;

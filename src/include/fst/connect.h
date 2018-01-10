@@ -146,7 +146,7 @@ class SccVisitor {
   void FinishVisit() {
     // Numbers SCC's in topological order when acyclic.
     if (scc_)
-      for (StateId i = 0; i < scc_->size(); ++i)
+        for (StateId i = 0; (size_t)i < scc_->size(); ++i)
         (*scc_)[i] = nscc_ - 1 - (*scc_)[i];
     if (coaccess_internal_) delete coaccess_;
     delete dfnumber_;
@@ -197,7 +197,7 @@ inline void SccVisitor<A>::InitVisit(const Fst<A> &fst) {
 template <class A>
 inline bool SccVisitor<A>::InitState(StateId s, StateId root) {
   scc_stack_->push_back(s);
-  while (dfnumber_->size() <= s) {
+  while (dfnumber_->size() <= (size_t)s) {
     if (scc_) scc_->push_back(-1);
     if (access_) access_->push_back(false);
     coaccess_->push_back(false);

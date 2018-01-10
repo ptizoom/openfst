@@ -30,7 +30,7 @@ namespace fst {
 template <class Arc>
 void Concat(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
   typedef typename Arc::Weight Weight;
 
   // Checks that the symbol table are compatible.
@@ -91,7 +91,7 @@ void Concat(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
 template <class Arc>
 void Concat(const Fst<Arc> &fst1, MutableFst<Arc> *fst2) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
   typedef typename Arc::Weight Weight;
 
   // Checks that the symbol table are compatible.

@@ -128,7 +128,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
   VectorFstBaseImpl() : start_(kNoStateId) {}
 
   ~VectorFstBaseImpl() override {
-    for (StateId s = 0; s < states_.size(); ++s)
+      for (StateId s = 0; (size_t)s < states_.size(); ++s)
       State::Destroy(states_[s], &state_alloc_);
   }
 
@@ -379,7 +379,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
   }
 
   StateId s = 0;
-  for (; hdr.NumStates() == kNoStateId || s < hdr.NumStates(); ++s) {
+  for (; hdr.NumStates() == kNoStateId || s < (StateId) hdr.NumStates(); ++s) {
     typename A::Weight final;
     if (!final.Read(strm)) break;
     impl->BaseImpl::AddState();
@@ -393,7 +393,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       return nullptr;
     }
     impl->ReserveArcs(s, narcs);
-    for (size_t j = 0; j < narcs; ++j) {
+    for (size_t j = 0; j < (size_t) narcs; ++j) {
       A arc;
       ReadType(strm, &arc.ilabel);
       ReadType(strm, &arc.olabel);
@@ -407,7 +407,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       impl->BaseImpl::AddArc(s, arc);
     }
   }
-  if (hdr.NumStates() != kNoStateId && s != hdr.NumStates()) {
+  if (hdr.NumStates() != kNoStateId && s != (StateId)hdr.NumStates()) {
     LOG(ERROR) << "VectorFst::Read: Unexpected end of file: " << opts.source;
     delete impl;
     return nullptr;
@@ -576,7 +576,7 @@ bool VectorFst<A, S>::WriteFst(const F &fst, std::ostream &strm,
   hdr.SetNumStates(kNoStateId);
   size_t start_offset = 0;
   if (fst.Properties(kExpanded, false) || opts.stream_write ||
-      (start_offset = strm.tellp()) != -1) {
+      (start_offset = strm.tellp()) != kNoStateId) {
     hdr.SetNumStates(CountStates(fst));
     update_header = false;
   }
@@ -609,7 +609,7 @@ bool VectorFst<A, S>::WriteFst(const F &fst, std::ostream &strm,
     return FstImpl<A>::UpdateFstHeader(fst, strm, opts, kFileVersion, "vector",
                                        properties, &hdr, start_offset);
   } else {
-    if (num_states != hdr.NumStates()) {
+      if (num_states != static_cast< StateId >(hdr.NumStates())) {
       LOG(ERROR) << "Inconsistent number of states observed during write";
       return false;
     }

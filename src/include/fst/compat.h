@@ -54,10 +54,11 @@ inline To down_cast(From* f) {
 // Bitcasting
 template <class Dest, class Source>
 inline Dest bit_cast(const Source& source) {
-  // Compile time assertion: sizeof(Dest) == sizeof(Source)
-  // A compile error here means your Dest and Source have different sizes.
-  typedef char VerifySizesAreEqual [sizeof(Dest) == sizeof(Source) ? 1 :
-                                    -1];
+#if 0 //PTZ170605
+    // Compile time assertion: sizeof(Dest) == sizeof(Source)
+    // A compile error here means your Dest and Source have different sizes.
+    typedef char VerifySizesAreEqual [sizeof(Dest) == sizeof(Source) ? 1 : -1];
+#endif
   Dest dest;
   memcpy(&dest, &source, sizeof(dest));
   return dest;
@@ -83,7 +84,7 @@ class CheckSummer {
   }
 
   void Update(string const &data) {
-    for (int i = 0; i < data.size(); ++i)
+    for (unsigned int i = 0; i < data.size(); ++i)
       check_sum_[(count_++) % kCheckSumLength] ^= data[i];
   }
 

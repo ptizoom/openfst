@@ -218,7 +218,7 @@ class SequenceComposeFilter {
         fst1_(matcher1_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+        f_() {}
 
   SequenceComposeFilter(const SequenceComposeFilter<M1, M2> &filter,
                         bool safe = false)
@@ -227,7 +227,7 @@ class SequenceComposeFilter {
         fst1_(matcher1_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+        f_() {}
 
   ~SequenceComposeFilter() {
     delete matcher1_;
@@ -302,7 +302,7 @@ class AltSequenceComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+      f_() {}
 
   AltSequenceComposeFilter(const AltSequenceComposeFilter<M1, M2> &filter,
                            bool safe = false)
@@ -311,7 +311,7 @@ class AltSequenceComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+        f_() {}
 
   ~AltSequenceComposeFilter() {
     delete matcher1_;
@@ -387,7 +387,7 @@ class MatchComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+      f_() {}
 
   MatchComposeFilter(const MatchComposeFilter<M1, M2> &filter,
                      bool safe = false)
@@ -397,7 +397,7 @@ class MatchComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        f_(kNoStateId) {}
+        f_() {}
 
   ~MatchComposeFilter() {
     delete matcher1_;

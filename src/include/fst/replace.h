@@ -1174,7 +1174,9 @@ class ArcIterator<ReplaceFst<A, T, C>> {
  public:
   typedef A Arc;
   typedef typename A::StateId StateId;
-
+  typedef typename C::State State;
+  typedef CacheBaseImpl<State, C> CImpl;
+  
   ArcIterator(const ReplaceFst<A, T, C>& fst, StateId s)
       : fst_(fst),
         state_(s),
@@ -1193,10 +1195,15 @@ class ArcIterator<ReplaceFst<A, T, C>> {
       fst_.GetMutableImpl()->Expand(state_);
 
     // If state is already cached, use cached arcs array.
+    //PTZ170814 scoffs gcc5.7 on this structure...
+    //->template CacheBaseImpl< typename C::State, C >::InitArcIterator(state_, &cache_data_);
+    // include/fst/replace.h: Dans le constructeur « fst::ArcIterator<fst::ReplaceFst<A, T, C> >::ArcIterator(const fst::ReplaceFst<A, T, C>&, fst::ArcIterator<fst::ReplaceFst<A, T, C> >::StateId) »:
+    // include/fst/replace.h:1198:59: error: expected « ; » before « :: » token
+    //       ->template CacheBaseImpl< typename C::State, C >::InitArcIterator(
+    //                                                       ^~
     if (fst_.GetImpl()->HasArcs(state_)) {
       (fst_.GetImpl())
-          ->template CacheBaseImpl<typename C::State, C>::InitArcIterator(
-              state_, &cache_data_);
+              ->CImpl::InitArcIterator(state_, &cache_data_);
       num_arcs_ = cache_data_.narcs;
       arcs_ = cache_data_.arcs;      // 'arcs_' is a ptr to the cached arcs.
       data_flags_ = kArcValueFlags;  // All the arc member values are valid.

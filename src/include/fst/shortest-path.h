@@ -95,7 +95,7 @@ void SingleShortestTree(
     const Fst<Arc> &ifst, MutableFst<Arc> *ofst,
     const std::vector<std::pair<typename Arc::StateId, size_t>> &parent) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Weight Weight;
+  typedef typename Arc::Weight Weight ATTRIBUTE_UNUSED;
   ofst->DeleteStates();
   ofst->SetInputSymbols(ifst.InputSymbols());
   ofst->SetOutputSymbols(ifst.OutputSymbols());
@@ -311,7 +311,7 @@ void NShortestPath(const Fst<RevArc> &ifst, MutableFst<Arc> *ofst,
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Weight Weight;
   typedef std::pair<StateId, Weight> Pair;
-  typedef typename RevArc::Weight RevWeight;
+  typedef typename RevArc::Weight RevWeight ATTRIBUTE_UNUSED;
 
   if (n <= 0) return;
   if ((Weight::Properties() & (kPath | kSemiring)) != (kPath | kSemiring)) {

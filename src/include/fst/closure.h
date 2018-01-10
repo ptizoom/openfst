@@ -29,7 +29,7 @@ namespace fst {
 template <class Arc>
 void Closure(MutableFst<Arc> *fst, ClosureType closure_type) {
   typedef typename Arc::StateId StateId;
-  typedef typename Arc::Label Label;
+  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
   typedef typename Arc::Weight Weight;
 
   uint64 props = fst->Properties(kFstProperties, false);

@@ -144,7 +144,7 @@ bool Equivalent(const Fst<Arc> &fst1, const Fst<Arc> &fst2,
   }
 
   // Convenience typedefs:
-  typedef typename Arc::StateId StateId;
+  typedef typename Arc::StateId StateId ATTRIBUTE_UNUSED;
   typedef EquivalenceUtil<Arc> Util;
   typedef typename Util::MappedId MappedId;
   enum { FST1 = 1, FST2 = 2 };  // Required by Util::MapState(...)

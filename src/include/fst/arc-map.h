@@ -171,13 +171,14 @@ void ArcMap(MutableFst<A> *fst, C mapper) {
   ArcMap(fst, &mapper);
 }
 
+
 // Maps an arc type A to an arc type B using mapper function
 // object C, passed by pointer. This version writes the mapped
 // input Fst to an output MutableFst.
 template <class A, class B, class C>
 void ArcMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
   typedef typename A::StateId StateId;
-  typedef typename A::Weight Weight;
+  typedef typename A::Weight Weight ATTRIBUTE_UNUSED;
 
   ofst->DeleteStates();
 

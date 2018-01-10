@@ -123,10 +123,10 @@ class SymbolTableImpl {
     if (key < 0 || key >= dense_key_limit_) {
       map<int64, int64>::const_iterator iter =
           key_map_.find(key);
-      if (iter == key_map_.end()) return "";
+      if (iter ==  key_map_.end()) return "";
       idx = iter->second;
     }
-    if (idx < 0 || idx >= symbols_.size()) return "";
+    if (idx < 0 || (uint64) idx >= symbols_.size()) return "";
     return symbols_.GetSymbol(idx);
   }
 
@@ -143,7 +143,7 @@ class SymbolTableImpl {
   int64 Find(const char* symbol) const { return Find(string(symbol)); }
 
   int64 GetNthKey(ssize_t pos) const {
-    if (pos < 0 || pos >= symbols_.size()) return -1;
+      if (pos < 0 || (size_t)pos >= symbols_.size()) return -1;
     if (pos < dense_key_limit_) return pos;
     return Find(symbols_.GetSymbol(pos));
   }
@@ -398,7 +398,7 @@ class SymbolTableIterator {
   ~SymbolTableIterator() {}
 
   // is iterator done
-  bool Done(void) const { return (pos_ == nsymbols_); }
+  bool Done(void) const { return ((size_t)pos_ == nsymbols_); }
 
   // return the Value() of the current symbol (int64 key)
   int64 Value(void) const { return key_; }
@@ -409,7 +409,7 @@ class SymbolTableIterator {
   // advance iterator forward
   void Next(void) {
     ++pos_;
-    if (pos_ < nsymbols_) key_ = table_.GetNthKey(pos_);
+    if (pos_ >= 0 && (size_t) pos_ < nsymbols_) key_ = table_.GetNthKey(pos_);
   }
 
   // reset iterator

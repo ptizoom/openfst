@@ -13,6 +13,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <climits>
+
+#if defined(__GNUC__)
+#define ATTRIBUTE_UNUSED __attribute__ ((unused))
+#else
+#define ATTRIBUTE_UNUSED
+#endif
 
 #include <fst/compat.h>
 #include <fst/types.h>
@@ -608,7 +615,7 @@ typedef Fst<StdArc> StdFst;
 //  CONSTANT DEFINITIONS
 //
 
-const int kNoStateId = -1;  // Not a valid state ID
+const size_t kNoStateId = UINT_MAX;  // Not a valid state ID
 const int kNoLabel = -1;    // Not a valid label
 
 //
