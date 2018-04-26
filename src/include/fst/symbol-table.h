@@ -139,7 +139,9 @@ class SymbolTableImpl {
       if (it == key_map_.end()) return "";
       idx = it->second;
     }
-    if (idx < 0 || idx >= symbols_.size()) return "";
+    //TODO:PTZ180426 we are loosing 1 bit,  (2^32 - 1) elements !
+    //for the sign instead of 1 element,  
+    if (idx < 0 || idx >= (int64) symbols_.size()) return "";
     return symbols_.GetSymbol(idx);
   }
 
@@ -156,7 +158,9 @@ class SymbolTableImpl {
   bool Member(const string &symbol) const { return Find(symbol) != kNoSymbol; }
 
   int64 GetNthKey(ssize_t pos) const {
-    if (pos < 0 || pos >= symbols_.size()) return kNoSymbol;
+      //TODO:PTZ180426 we are loosing 1 bit,  (2^32 - 1) elements !
+      //for the sign instead of 1 element  
+      if (pos < 0 || pos >= (ssize_t) symbols_.size()) return kNoSymbol;
     if (pos < dense_key_limit_) return pos;
     return Find(symbols_.GetSymbol(pos));
   }
@@ -400,7 +404,8 @@ class SymbolTableIterator {
   ~SymbolTableIterator() {}
 
   // Returns whether iterator is done.
-  bool Done() const { return (pos_ == nsymbols_); }
+  //PTZ180426 sign issues...we sould not use signed indexes ?!
+  bool Done() const { return (pos_ == (ssize_t)nsymbols_); }
 
   // Return the key of the current symbol.
   int64 Value() const { return key_; }
@@ -411,7 +416,8 @@ class SymbolTableIterator {
   // Advances iterator.
   void Next() {
     ++pos_;
-    if (pos_ < nsymbols_) key_ = table_.GetNthKey(pos_);
+    //PTZ180426 sign issues...we sould not use signed indexes ?!
+    if (pos_ < (ssize_t) nsymbols_) key_ = table_.GetNthKey(pos_);
   }
 
   // Resets iterator.

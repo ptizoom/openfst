@@ -10,5 +10,6 @@ config.h.in
 configure
 ltmain.sh
 m4/
-
-
+compile
+depcomp
+missing

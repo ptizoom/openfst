@@ -17,9 +17,9 @@ namespace fst {
 // Verifies that an Fst's contents are sane.
 template <class Arc>
 bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
-  using Label = typename Arc::Label;
+   //PTZ180426 not used? using Label = typename Arc::Label;
   using StateId = typename Arc::StateId;
-  using Weight = typename Arc::Weight;
+   //PTZ180426 not used? using Weight = typename Arc::Weight;
   const auto start = fst.Start();
   const auto *isyms = fst.InputSymbols();
   const auto *osyms = fst.OutputSymbols();
