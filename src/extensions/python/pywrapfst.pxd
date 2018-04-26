@@ -11,21 +11,22 @@ from libcpp.memory cimport unique_ptr
 from libcpp.utility cimport pair
 from libcpp.vector cimport vector
 
+from libcpp.string cimport string
 from basictypes cimport int32
 from basictypes cimport int64
 from basictypes cimport uint32
 from basictypes cimport uint64
 cimport fst as fst
 from ios cimport stringstream
-from libcpp.string cimport string
 
 
-# Exportable helper functions
+
+# Exportable helper functions.
 
 
 cdef string tostring(data, encoding=?) except *
 
-cdef string weighttostring(data, encoding=?) except *
+cdef string weight_tostring(data, encoding=?) except *
 
 cdef fst.ComposeFilter _get_compose_filter(
     const string &compose_filter) except *
@@ -64,11 +65,11 @@ cdef class Weight(object):
   cpdef string type(self)
 
 
-cdef Weight _Weight_Zero(weight_type)
+cdef Weight _Zero(weight_type)
 
-cdef Weight _Weight_One(weight_type)
+cdef Weight _One(weight_type)
 
-cdef Weight _Weight_NoWeight(weight_type)
+cdef Weight _NoWeight(weight_type)
 
 cdef Weight _plus(Weight lhs, Weight rhs)
 
@@ -308,8 +309,8 @@ cdef class _MutableFst(_Fst):
 
   cdef void _reweight(self, potentials, bool to_final=?) except *
 
-  cdef void _rmepsilon(self, bool connect=?, float delta=?, int64 nstate=?,
-                       weight=?) except *
+  cdef void _rmepsilon(self, queue_type=?, bool connect=?, weight=?,
+                       int64 nstate=?, float delta=?) except *
 
   cdef void _set_final(self, int64 state, weight=?) except *
 
@@ -337,9 +338,9 @@ cdef _Fst _init_XFst(FstClass_ptr tfst)
 
 cdef _MutableFst _create_Fst(arc_type=?)
 
-cdef _Fst _read_Fst(filename, fst_type=?)
+cpdef _Fst _read(filename)
 
-cdef _Fst _deserialize_Fst(fst_string, fst_type=?)
+cpdef _Fst _read_from_string(State)
 
 
 # Iterators.
@@ -418,9 +419,9 @@ cdef class StateIterator(object):
 # Constructive operations on Fst.
 
 
-cdef _Fst _map(_Fst ifst, float delta=?, map_type=?, weight=?)
+cdef _Fst _map(_Fst ifst, float delta=?, map_type=?, double power=?, weight=?)
 
-cpdef _Fst arcmap(_Fst ifst, float delta=?, map_type=?, weight=?)
+cpdef _Fst arcmap(_Fst ifst, float delta=?, map_type=?, double power=?, weight=?)
 
 cpdef _MutableFst compose(_Fst ifst1, _Fst ifst2, compose_filter=?,
                           bool connect=?)
@@ -471,10 +472,6 @@ cpdef _MutableFst replace(pairs, call_arc_labeling=?, return_arc_labeling=?,
 
 cpdef _MutableFst reverse(_Fst ifst, bool require_superinitial=?)
 
-cpdef _MutableFst rmepsilon(_Fst ifst, bool connect=?, float delta=?,
-                            int64 nstate=?, queue_type=?, bool reverse=?,
-                            weight=?)
-
 cdef vector[fst.WeightClass] *_shortestdistance(_Fst ifst, float delta=?,
                                                 int64 nstate=?, queue_type=?,
                                                 bool reverse=?) except *
@@ -524,7 +521,7 @@ cdef class FarReader(object):
 
   cpdef string far_type(self)
 
-  cpdef bool find(self, key)
+  cpdef bool find(self, key) except *
 
   cpdef _Fst get_fst(self)
 
@@ -543,7 +540,7 @@ cdef class FarWriter(object):
 
   cpdef string arc_type(self)
 
-  cdef void _close(self)
+  cdef void close(self)
 
   cpdef void add(self, key, _Fst ifst) except *
 

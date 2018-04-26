@@ -3,8 +3,8 @@
 //
 // Classes for representing the mapping between state tuples and state IDs.
 
-#ifndef FST_LIB_STATE_TABLE_H_
-#define FST_LIB_STATE_TABLE_H_
+#ifndef FST_STATE_TABLE_H_
+#define FST_STATE_TABLE_H_
 
 #include <deque>
 #include <utility>
@@ -106,7 +106,7 @@ class CompactHashStateTable
 // passed a fingerprint functor that should fingerprint tuples uniquely to an
 // integer that can used as a vector index. Normally, VectorStateTable
 // constructs the fingerprint functor. Alternately, the user can pass this
-// objert, in which case the table takes ownership.
+// object, in which case the table takes ownership.
 template <class T, class FP>
 class VectorStateTable : public VectorBiTable<typename T::StateId, T, FP> {
  public:
@@ -252,7 +252,9 @@ class DefaultComposeStateTuple {
   }
 
   size_t Hash() const {
-    return StateId1() + StateId2() * 7853 + GetFilterState().Hash() * 7867;
+    return static_cast<size_t>(StateId1()) +
+           static_cast<size_t>(StateId2()) * 7853u +
+           GetFilterState().Hash() * 7867u;
   }
 
  private:
@@ -392,7 +394,7 @@ class ProductComposeStateTable
 };
 
 // A vector-backed table over composition tuples which can be used when the
-// first FST is a string (i.e., satisfies kStringProperties) and the second is
+// first FST is a string (i.e., satisfies kString property) and the second is
 // deterministic and epsilon-free. It should be used with a composition filter
 // that creates at most one filter state per tuple under these conditions (e.g.,
 // SequenceComposeFilter or MatchComposeFilter).
@@ -489,4 +491,4 @@ class ErasableComposeStateTable
 
 }  // namespace fst
 
-#endif  // FST_LIB_STATE_TABLE_H_
+#endif  // FST_STATE_TABLE_H_

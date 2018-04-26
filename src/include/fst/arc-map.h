@@ -5,8 +5,8 @@
 // implement project/invert. Consider using when operation does
 // not change the number of arcs (except possibly superfinal arcs).
 
-#ifndef FST_LIB_ARC_MAP_H_
-#define FST_LIB_ARC_MAP_H_
+#ifndef FST_ARC_MAP_H_
+#define FST_ARC_MAP_H_
 
 #include <string>
 #include <unordered_map>
@@ -718,8 +718,21 @@ class SuperFinalMapper {
  public:
   using FromArc = A;
   using ToArc = A;
+  using Label = typename FromArc::Label;
+  using Weight = typename FromArc::Weight;;
 
-  ToArc operator()(const FromArc &arc) const { return arc; }
+  // Arg allows setting super-final label.
+  explicit SuperFinalMapper(Label final_label = 0)
+      : final_label_(final_label) {}
+
+  ToArc operator()(const FromArc &arc) const {
+    // Super-final arc.
+    if (arc.nextstate == kNoStateId && arc.weight != Weight::Zero()) {
+      return ToArc(final_label_, final_label_, arc.weight, kNoStateId);
+    } else {
+      return arc;
+    }
+  }
 
   constexpr MapFinalAction FinalAction() const {
     return MAP_REQUIRE_SUPERFINAL;
@@ -734,8 +747,16 @@ class SuperFinalMapper {
   }
 
   uint64 Properties(uint64 props) const {
-    return props & kAddSuperFinalProperties;
+    if (final_label_ == 0) {
+      return props & kAddSuperFinalProperties;
+    } else {
+      return props & kAddSuperFinalProperties &
+          kILabelInvariantProperties & kOLabelInvariantProperties;
+    }
   }
+
+ private:
+  Label final_label_;
 };
 
 // Mapper that leaves labels and nextstate unchanged and constructs a new weight
@@ -1026,6 +1047,9 @@ class GallicToNewSymbolsMapper {
   mutable bool error_;
 };
 
+// TODO(kbg): Add common base class for those mappers which do nothing except
+// mutate their weights.
+
 // Mapper to add a constant to all weights.
 template <class A>
 class PlusMapper {
@@ -1094,7 +1118,11 @@ class TimesMapper {
   const Weight weight_;
 };
 
-// Mapper to take all arc-weights to a fixed power.
+// Mapper to take all weights to a constant power. The power argument is stored
+// as a double, so if there is a floating-point power implementation for this
+// weight type, it will take precedence. Otherwise, the power argument's 53 bits
+// of integer precision will be implicitly converted to a size_t and the default
+// power implementation (iterated multiplication) will be used instead.
 template <class A>
 class PowerMapper {
  public:
@@ -1102,25 +1130,29 @@ class PowerMapper {
   using ToArc = A;
   using Weight = typename FromArc::Weight;
 
-  explicit PowerMapper(size_t power) : power_(power) {}
+  explicit PowerMapper(double power) : power_(power) {}
 
   ToArc operator()(const FromArc &arc) const {
     return ToArc(arc.ilabel, arc.olabel, Power(arc.weight, power_),
                  arc.nextstate);
   }
 
-  MapFinalAction FinalAction() const { return MAP_NO_SUPERFINAL; }
+  constexpr MapFinalAction FinalAction() const { return MAP_NO_SUPERFINAL; }
 
-  MapSymbolsAction InputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
+  constexpr MapSymbolsAction InputSymbolsAction() const {
+    return MAP_COPY_SYMBOLS;
+  }
 
-  MapSymbolsAction OutputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
+  constexpr MapSymbolsAction OutputSymbolsAction() const {
+    return MAP_COPY_SYMBOLS;
+  }
 
   uint64 Properties(uint64 props) const {
     return props & kWeightInvariantProperties;
   }
 
  private:
-  size_t power_;
+  const double power_;
 };
 
 // Mapper to reciprocate all non-Zero() weights.
@@ -1251,4 +1283,4 @@ class ReverseWeightMapper {
 
 }  // namespace fst
 
-#endif  // FST_LIB_ARC_MAP_H_
+#endif  // FST_ARC_MAP_H_

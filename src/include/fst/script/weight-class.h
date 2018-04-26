@@ -81,7 +81,7 @@ class WeightClassImpl : public WeightImplBase {
   }
 
   WeightClassImpl<W> &PowerEq(size_t n) final {
-    weight_ = Power(weight_, n);
+    weight_ = Power<W>(weight_, n);
     return *this;
   }
 
@@ -140,8 +140,8 @@ class WeightClass {
 
   const string &Type() const {
     if (impl_) return impl_->Type();
-    static const string no_type = "none";
-    return no_type;
+    static const string *const no_type = new string("none");
+    return *no_type;
   }
 
   bool WeightTypesMatch(const WeightClass &other, const string &op_name) const;
@@ -220,7 +220,7 @@ using WeightClassRegisterer = GenericRegisterer<WeightClassRegister>;
 #define REGISTER_FST_WEIGHT_EXPANDER(Weight, line) \
   REGISTER_FST_WEIGHT__(Weight, line)
 
-// Macro for registering new weight types. Clients call this.
+// Macro for registering new weight types; clients call this.
 #define REGISTER_FST_WEIGHT(Weight) \
   REGISTER_FST_WEIGHT_EXPANDER(Weight, __LINE__)
 

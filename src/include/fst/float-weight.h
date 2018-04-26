@@ -3,13 +3,15 @@
 //
 // Float weight set and associated semiring operation definitions.
 
-#ifndef FST_LIB_FLOAT_WEIGHT_H_
-#define FST_LIB_FLOAT_WEIGHT_H_
+#ifndef FST_FLOAT_WEIGHT_H_
+#define FST_FLOAT_WEIGHT_H_
 
 #include <climits>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 
+#include <algorithm>
 #include <limits>
 #include <sstream>
 #include <string>
@@ -57,13 +59,13 @@ class FloatWeightTpl {
   }
 
   size_t Hash() const {
-    union {
-      T f;
-      size_t s;
-    } u;
-    u.s = 0;
-    u.f = value_;
-    return u.s;
+    size_t hash = 0;
+    // Avoid using union, which would be undefined behavior.
+    // Use memcpy, similar to bit_cast, but sizes may be different.
+    // This should be optimized into a single move instruction by
+    // any reasonable compiler.
+    std::memcpy(&hash, &value_, std::min(sizeof(hash), sizeof(value_)));
+    return hash;
   }
 
   const T &Value() const { return value_; }
@@ -97,14 +99,18 @@ inline bool operator==(const FloatWeightTpl<T> &w1,
   return v1 == v2;
 }
 
-inline bool operator==(const FloatWeightTpl<double> &w1,
-                       const FloatWeightTpl<double> &w2) {
-  return operator==<double>(w1, w2);
-}
-
+// These seemingly unnecessary overloads are actually needed to make
+// comparisons like FloatWeightTpl<float> == float compile.  If only the
+// templated version exists, the FloatWeightTpl<float>(float) conversion
+// won't be found.
 inline bool operator==(const FloatWeightTpl<float> &w1,
                        const FloatWeightTpl<float> &w2) {
   return operator==<float>(w1, w2);
+}
+
+inline bool operator==(const FloatWeightTpl<double> &w1,
+                       const FloatWeightTpl<double> &w2) {
+  return operator==<double>(w1, w2);
 }
 
 template <class T>
@@ -113,14 +119,14 @@ inline bool operator!=(const FloatWeightTpl<T> &w1,
   return !(w1 == w2);
 }
 
-inline bool operator!=(const FloatWeightTpl<double> &w1,
-                       const FloatWeightTpl<double> &w2) {
-  return operator!=<double>(w1, w2);
-}
-
 inline bool operator!=(const FloatWeightTpl<float> &w1,
                        const FloatWeightTpl<float> &w2) {
   return operator!=<float>(w1, w2);
+}
+
+inline bool operator!=(const FloatWeightTpl<double> &w1,
+                       const FloatWeightTpl<double> &w2) {
+  return operator!=<double>(w1, w2);
 }
 
 template <class T>
@@ -231,6 +237,8 @@ inline TropicalWeightTpl<T> Plus(const TropicalWeightTpl<T> &w1,
   return w1.Value() < w2.Value() ? w1 : w2;
 }
 
+// See comment at operator==(FloatWeightTpl<float>, FloatWeightTpl<float>)
+// for why these overloads are present.
 inline TropicalWeightTpl<float> Plus(const TropicalWeightTpl<float> &w1,
                                      const TropicalWeightTpl<float> &w2) {
   return Plus<float>(w1, w2);
@@ -296,11 +304,31 @@ inline TropicalWeightTpl<double> Divide(const TropicalWeightTpl<double> &w1,
   return Divide<double>(w1, w2, typ);
 }
 
-template <class T>
-inline TropicalWeightTpl<T> Power(const TropicalWeightTpl<T> &weight,
-                                  T scalar) {
-  return TropicalWeightTpl<T>(weight.Value() * scalar);
+template <class T, class V>
+inline TropicalWeightTpl<T> Power(const TropicalWeightTpl<T> &weight, V n) {
+  if (n == 0) {
+    return TropicalWeightTpl<T>::One();
+  } else if (weight == TropicalWeightTpl<T>::Zero()) {
+    return TropicalWeightTpl<T>::Zero();
+  }
+  return TropicalWeightTpl<T>(weight.Value() * n);
 }
+
+// Specializes the library-wide template to use the above implementation; rules
+// of function template instantiation require this be a full instantiation.
+
+template <>
+inline TropicalWeightTpl<float> Power<TropicalWeightTpl<float>>(
+    const TropicalWeightTpl<float> &weight, size_t n) {
+  return Power<float, size_t>(weight, n);
+}
+
+template <>
+inline TropicalWeightTpl<double> Power<TropicalWeightTpl<double>>(
+    const TropicalWeightTpl<double> &weight, size_t n) {
+  return Power<double, size_t>(weight, n);
+}
+
 
 // Log semiring: (log(e^-x + e^-y), +, inf, 0).
 template <class T>
@@ -368,16 +396,23 @@ using Log64Weight = LogWeightTpl<double>;
 namespace internal {
 
 // -log(e^-x + e^-y) = x - LogPosExp(y - x), assuming x >= 0.0.
-inline double LogPosExp(double x) { return log1p(exp(-x)); }
+inline double LogPosExp(double x) {
+  DCHECK(!(x < 0));  // NB: NaN values are allowed.
+  return log1p(exp(-x));
+}
 
 // -log(e^-x - e^-y) = x - LogNegExp(y - x), assuming x > 0.0.
-inline double LogNegExp(double x) { return log1p(-exp(-x)); }
+inline double LogNegExp(double x) {
+  DCHECK_GT(x, 0);
+  return log1p(-exp(-x));
+}
 
 // a +_log b = -log(e^-a + e^-b) = KahanLogSum(a, b, ...).
 // Kahan compensated summation provides an error bound that is
 // independent of the number of addends. Assumes b >= a;
 // c is the compensation.
 inline double KahanLogSum(double a, double b, double *c) {
+  DCHECK_GE(b, a);
   double y = -LogPosExp(b - a) - *c;
   double t = a + y;
   *c = (t - a) - y;
@@ -389,6 +424,7 @@ inline double KahanLogSum(double a, double b, double *c) {
 // independent of the number of addends. Assumes b > a;
 // c is the compensation.
 inline double KahanLogDiff(double a, double b, double *c) {
+  DCHECK_GT(b, a);
   double y = -LogNegExp(b - a) - *c;
   double t = a + y;
   *c = (t - a) - y;
@@ -479,9 +515,29 @@ inline LogWeightTpl<double> Divide(const LogWeightTpl<double> &w1,
   return Divide<double>(w1, w2, typ);
 }
 
-template <class T>
-inline LogWeightTpl<T> Power(const LogWeightTpl<T> &weight, T scalar) {
-  return LogWeightTpl<T>(weight.Value() * scalar);
+template <class T, class V>
+inline LogWeightTpl<T> Power(const LogWeightTpl<T> &weight, V n) {
+  if (n == 0) {
+    return LogWeightTpl<T>::One();
+  } else if (weight == LogWeightTpl<T>::Zero()) {
+    return LogWeightTpl<T>::Zero();
+  }
+  return LogWeightTpl<T>(weight.Value() * n);
+}
+
+// Specializes the library-wide template to use the above implementation; rules
+// of function template instantiation require this be a full instantiation.
+
+template <>
+inline LogWeightTpl<float> Power<LogWeightTpl<float>>(
+    const LogWeightTpl<float> &weight, size_t n) {
+  return Power<float, size_t>(weight, n);
+}
+
+template <>
+inline LogWeightTpl<double> Power<LogWeightTpl<double>>(
+    const LogWeightTpl<double> &weight, size_t n) {
+  return Power<double, size_t>(weight, n);
 }
 
 // Specialization using the Kahan compensated summation.
@@ -495,7 +551,7 @@ class Adder<LogWeightTpl<T>> {
         c_(0.0) { }
 
   Weight Add(const Weight &w) {
-  using Limits = FloatLimits<T>;
+    using Limits = FloatLimits<T>;
     const T f = w.Value();
     if (f == Limits::PosInfinity()) {
       return Sum();
@@ -761,4 +817,4 @@ class WeightGenerate<MinMaxWeightTpl<T>> {
 
 }  // namespace fst
 
-#endif  // FST_LIB_FLOAT_WEIGHT_H_
+#endif  // FST_FLOAT_WEIGHT_H_

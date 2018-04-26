@@ -3,8 +3,8 @@
 //
 // Classes to accumulate arc weights. Useful for weight lookahead.
 
-#ifndef FST_LIB_ACCUMULATOR_H_
-#define FST_LIB_ACCUMULATOR_H_
+#ifndef FST_ACCUMULATOR_H_
+#define FST_ACCUMULATOR_H_
 
 #include <algorithm>
 #include <functional>
@@ -87,6 +87,9 @@ class LogAccumulator {
 
  private:
   Weight LogPlus(Weight w, Weight v) {
+    if (w == Weight::Zero()) {
+      return v;
+    }
     const auto f1 = to_log_weight_(w).Value();
     const auto f2 = to_log_weight_(v).Value();
     if (f1 > f2) {
@@ -335,6 +338,9 @@ class FastLogAccumulator {
   }
 
   Weight LogPlus(Weight w, Weight v) const {
+    if (w == Weight::Zero()) {
+      return v;
+    }
     const auto f1 = to_log_weight_(w).Value();
     const auto f2 = to_log_weight_(v).Value();
     if (f1 > f2) {
@@ -575,6 +581,9 @@ class CacheLogAccumulator {
   }
 
   Weight LogPlus(Weight w, Weight v) {
+    if (w == Weight::Zero()) {
+      return v;
+    }
     const auto f1 = to_log_weight_(w).Value();
     const auto f2 = to_log_weight_(v).Value();
     if (f1 > f2) {
@@ -891,4 +900,4 @@ class SafeReplaceAccumulator {
 
 }  // namespace fst
 
-#endif  // FST_LIB_ACCUMULATOR_H_
+#endif  // FST_ACCUMULATOR_H_

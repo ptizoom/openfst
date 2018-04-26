@@ -9,7 +9,6 @@
 #include <sstream>
 #include <utility>
 
-#include <fst/types.h>
 #include <fst/log.h>
 #include <fstream>
 #include <fst/util.h>
@@ -25,15 +24,15 @@ bool ReadPotentials(const string &weight_type, const string &filename,
     LOG(ERROR) << "ReadPotentials: Can't open file: " << filename;
     return false;
   }
-  static const int kLineLen = 8096;
+  static constexpr int kLineLen = 8096;
   char line[kLineLen];
   size_t nline = 0;
   potentials->clear();
   while (!istrm.getline(line, kLineLen).fail()) {
     ++nline;
     std::vector<char *> col;
-    SplitToVector(line, "\n\t ", &col, true);
-    if (col.size() == 0 || col[0][0] == '\0') continue;
+    SplitString(line, "\n\t ", &col, true);
+    if (col.empty() || col[0][0] == '\0') continue;
     if (col.size() != 2) {
       FSTERROR() << "ReadPotentials: Bad number of columns, "
                  << "file = " << filename << ", line = " << nline;
