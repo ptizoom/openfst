@@ -341,7 +341,7 @@ bool ConstFst<Arc, Unsigned>::WriteFst(const FST &fst, std::ostream &strm,
     num_arcs = impl->narcs_;
     num_states = impl->nstates_;
     update_header = false;
-  } else if (opts.stream_write || (start_offset = strm.tellp()) == -1) {
+  } else if (opts.stream_write || (start_offset = strm.tellp()) == (size_t)-1) {
     // precompute values needed for header when we cannot seek to rewrite it.
     num_arcs = 0;
     num_states = 0;
@@ -411,11 +411,11 @@ bool ConstFst<Arc, Unsigned>::WriteFst(const FST &fst, std::ostream &strm,
     return internal::FstImpl<Arc>::UpdateFstHeader(
         fst, strm, opts, file_version, type, properties, &hdr, start_offset);
   } else {
-    if (hdr.NumStates() != num_states) {
+      if ((size_t)hdr.NumStates() != num_states) {
       LOG(ERROR) << "Inconsistent number of states observed during write";
       return false;
     }
-    if (hdr.NumArcs() != num_arcs) {
+      if ((size_t)hdr.NumArcs() != num_arcs) {
       LOG(ERROR) << "Inconsistent number of arcs observed during write";
       return false;
     }

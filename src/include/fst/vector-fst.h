@@ -389,7 +389,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
   impl->BaseImpl::SetStart(hdr.Start());
   if (hdr.NumStates() != kNoStateId) impl->ReserveStates(hdr.NumStates());
   StateId state = 0;
-  for (; hdr.NumStates() == kNoStateId || state < hdr.NumStates(); ++state) {
+  for (; hdr.NumStates() == kNoStateId || state < (StateId) hdr.NumStates(); ++state) {
     Weight weight;
     if (!weight.Read(strm)) break;
     impl->BaseImpl::AddState();
@@ -402,7 +402,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       return nullptr;
     }
     impl->ReserveArcs(state, narcs);
-    for (int64 i = 0; i < narcs; ++i) {
+    for (size_t i = 0; i < (size_t) narcs; ++i) {
       Arc arc;
       ReadType(strm, &arc.ilabel);
       ReadType(strm, &arc.olabel);
@@ -415,7 +415,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       impl->BaseImpl::AddArc(state, arc);
     }
   }
-  if (hdr.NumStates() != kNoStateId && state != hdr.NumStates()) {
+  if (hdr.NumStates() != kNoStateId && state != (StateId)hdr.NumStates()) {
     LOG(ERROR) << "VectorFst::Read: Unexpected end of file: " << opts.source;
     return nullptr;
   }

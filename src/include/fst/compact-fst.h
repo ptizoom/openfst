@@ -284,7 +284,7 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
     for (ArcIterator<Fst<Arc>> aiter(fst, s); !aiter.Done(); aiter.Next()) {
       compacts_[pos++] = compactor.Compact(s, aiter.Value());
     }
-    if ((compactor.Size() != -1) && ((pos - fpos) != compactor.Size())) {
+    if ((compactor.Size() != -1) && ((pos - fpos) != (size_t)compactor.Size())) {
       FSTERROR() << "DefaultCompactStore: Compactor incompatible with FST";
       error_ = true;
       return;
