@@ -3,6 +3,9 @@ AC_INIT([OpenFst], [1.5.3], [help@www.openfst.org])
 AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror])
 AM_MAINTAINER_MODE
 
+dnl PTZ180615  configure.ac:1861: error: AM_COND_IF: no such condition "COND_OPENFST" as used inside parent projects.
+AM_CONDITIONAL([COND_OPENFST],[test -z ""])
+
 AM_PROG_AR
 
 CXXFLAGS="$CXXFLAGS -std=c++11"
