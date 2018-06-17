@@ -142,4 +142,13 @@ AC_SUBST([libfstdir], $with_libfstdir)
 AC_CHECK_LIB([dl], dlopen, [DL_LIBS=-ldl])
 AC_SUBST([DL_LIBS])
 
+case "$host_os" in
+   mingw* | cygwin*)
+     AS_VAR_APPEND([LDFLAGS], " -no-undefined")
+     AS_VAR_APPEND([CXXFLAGS], " -Og")
+     ;;
+   *)
+     ;;
+esac
+
 AC_OUTPUT
