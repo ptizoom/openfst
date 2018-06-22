@@ -1,5 +1,9 @@
 // See www.openfst.org for extensive documentation on this weighted
 // finite-state transducer library.
+#if defined __CYGWIN__
+#pragma GCC push_options
+#pragma GCC optimize ("Og")
+#endif
 
 #include <fst/script/fst-class.h>
 #include <fst/script/disambiguate.h>
@@ -31,6 +35,7 @@ void Disambiguate(const FstClass &ifst, MutableFstClass *ofst,
   Apply<Operation<DisambiguateArgs2>>("Disambiguate", ifst.ArcType(), &args);
 }
 
+
 REGISTER_FST_OPERATION(Disambiguate, StdArc, DisambiguateArgs1);
 REGISTER_FST_OPERATION(Disambiguate, LogArc, DisambiguateArgs1);
 REGISTER_FST_OPERATION(Disambiguate, Log64Arc, DisambiguateArgs1);
@@ -41,3 +46,9 @@ REGISTER_FST_OPERATION(Disambiguate, Log64Arc, DisambiguateArgs2);
 
 }  // namespace script
 }  // namespace fst
+
+
+#if defined __CYGWIN__
+#pragma GCC pop_options
+#endif
+
