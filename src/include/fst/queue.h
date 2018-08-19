@@ -334,7 +334,7 @@ class TopOrderQueue : public QueueBase<S> {
 
   void Dequeue() final {
     state_[front_] = kNoStateId;
-    while ((front_ <= back_) && (state_[front_] == kNoStateId)) ++front_;
+    while ((front_ <= back_) && (state_[front_] == static_cast<StateId>(kNoStateId))) ++front_;
   }
 
   void Update(StateId) final {}
@@ -426,7 +426,7 @@ class SccQueue : public QueueBase<S> {
            (((*queue_)[front_] && (*queue_)[front_]->Empty()) ||
             (((*queue_)[front_] == nullptr) &&
              ((front_ >= trivial_queue_.size()) ||
-              (trivial_queue_[front_] == kNoStateId))))) {
+              (trivial_queue_[front_] == static_cast<StateId>(kNoStateId)))))) {
       ++front_;
     }
     if ((*queue_)[front_]) {
@@ -476,7 +476,7 @@ class SccQueue : public QueueBase<S> {
       return (*queue_)[front_]->Empty();
     } else {
       return (front_ >= trivial_queue_.size()) ||
-             (trivial_queue_[front_] == kNoStateId);
+          (trivial_queue_[front_] == static_cast<StateId>(kNoStateId));
     }
   }
 
@@ -520,7 +520,7 @@ class AutoQueue : public QueueBase<S> {
     // First checks if the FST is known to have these properties.
     const auto props =
         fst.Properties(kAcyclic | kCyclic | kTopSorted | kUnweighted, false);
-    if ((props & kTopSorted) || fst.Start() == kNoStateId) {
+    if ((props & kTopSorted) || fst.Start() == static_cast<StateId>(kNoStateId)) {
       queue_.reset(new StateOrderQueue<StateId>());
       VLOG(2) << "AutoQueue: using state-order discipline";
     } else if (props & kAcyclic) {

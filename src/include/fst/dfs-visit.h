@@ -93,11 +93,11 @@ struct DfsState {
 template <class FST, class Visitor, class ArcFilter>
 void DfsVisit(const FST &fst, Visitor *visitor, ArcFilter filter,
               bool access_only = false) {
-  //PTZ180426 not used?  using Arc = typename FST::Arc;
-  //PTZ180426 not used?  using StateId = typename Arc::StateId;
+  using Arc = typename FST::Arc;
+  using StateId = typename Arc::StateId;
   visitor->InitVisit(fst);
   const auto start = fst.Start();
-  if (start == kNoStateId) {
+  if (start == static_cast<StateId>(kNoStateId)) {
     visitor->FinishVisit();
     return;
   }

@@ -29,8 +29,8 @@ namespace fst {
 // FST.
 template <class Arc>
 void Union(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
-  typedef typename Arc::Label Label ATTRIBUTE_UNUSED;
-  using StateId = typename Arc::StateId;
+  using Label ATTRIBUTE_UNUSED = typename Arc::Label;
+  using StateId ATTRIBUTE_UNUSED = typename Arc::StateId;
   using Weight = typename Arc::Weight;
   // Checks for symbol table compatibility.
   if (!CompatSymbols(fst1->InputSymbols(), fst2.InputSymbols()) ||

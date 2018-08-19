@@ -50,7 +50,7 @@ struct EquivalenceUtil {
   // equivalence class. The parameter 'which_fst' takes the values 1
   // and 2, identifying the input FST.
   static MappedId MapState(StateId s, int32 which_fst) {
-    return (kNoStateId == s) ? kDeadState
+    return ((StateId)kNoStateId == s) ? kDeadState
                              : (static_cast<MappedId>(s) << 1) + which_fst;
   }
 

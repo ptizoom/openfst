@@ -66,6 +66,13 @@ inline Dest bit_cast(const Source &source) {
 
 // Check sums
 class CheckSummer {
+  static const int kCheckSumLength = 32;
+  int count_;
+  string check_sum_;
+
+  //CheckSummer(const CheckSummer &) = delete;
+  //CheckSummer &operator=(const CheckSummer &) = delete;
+  
  public:
   CheckSummer() : count_(0) {
     check_sum_.resize(kCheckSumLength, '\0');
@@ -82,22 +89,23 @@ class CheckSummer {
       check_sum_[(count_++) % kCheckSumLength] ^= p[i];
     }
   }
-
+  
   void Update(string const &data) {
-    for (unsigned int i = 0; i < data.size(); ++i)
-      check_sum_[(count_++) % kCheckSumLength] ^= data[i];
-    }
+      for (size_t i = 0; i < data.size(); i++) {
+          check_sum_[(count_++) % kCheckSumLength] ^= data[i];
+      }
   }
 
   string Digest() { return check_sum_; }
 
  private:
-  static const int kCheckSumLength = 32;
-  int count_;
-  string check_sum_;
+  //static const int kCheckSumLength = 32;
+  //int count_;
+  //string check_sum_;
 
   CheckSummer(const CheckSummer &) = delete;
   CheckSummer &operator=(const CheckSummer &) = delete;
+
 };
 
 }  // namespace fst

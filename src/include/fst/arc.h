@@ -28,7 +28,7 @@ struct ArcTpl {
  public:
   using Weight = W;
   using Label = int;
-  using StateId = int;
+  using StateId = unsigned int;
 
   Label ilabel;
   Label olabel;

@@ -247,7 +247,7 @@ inline void SccVisitor<Arc>::FinishState(StateId s, StateId p, const Arc *) {
     }
     ++nscc_;
   }
-  if (p != kNoStateId) {
+  if (p != static_cast<StateId>(kNoStateId)) {
     if ((*coaccess_)[s]) (*coaccess_)[p] = true;
     if ((*lowlink_)[s] < (*lowlink_)[p]) (*lowlink_)[p] = (*lowlink_)[s];
   }

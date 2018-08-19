@@ -260,7 +260,8 @@ template <class Arc>
 class EncodeMapper {
   using Label = typename Arc::Label;
   using Weight = typename Arc::Weight;
-
+  using StateId = typename Arc::StateId;
+  
  public:
   EncodeMapper(uint32 flags, EncodeType type)
       : flags_(flags),
@@ -375,8 +376,8 @@ class EncodeMapper {
 template <class Arc>
 Arc EncodeMapper<Arc>::operator()(const Arc &arc) {
   if (type_ == ENCODE) {
-    if ((arc.nextstate == kNoStateId && !(flags_ & kEncodeWeights)) ||
-        (arc.nextstate == kNoStateId && (flags_ & kEncodeWeights) &&
+      if ((arc.nextstate == static_cast<StateId>(kNoStateId) && !(flags_ & kEncodeWeights)) ||
+        (arc.nextstate == static_cast<StateId>(kNoStateId) && (flags_ & kEncodeWeights) &&
          arc.weight == Weight::Zero())) {
       return arc;
     } else {
@@ -386,7 +387,7 @@ Arc EncodeMapper<Arc>::operator()(const Arc &arc) {
                  arc.nextstate);
     }
   } else {  // type_ == DECODE
-    if (arc.nextstate == kNoStateId) {
+      if (arc.nextstate == static_cast<StateId>(kNoStateId)) {
       return arc;
     } else {
       if (arc.ilabel == 0) return arc;

@@ -196,7 +196,7 @@ uint64 ComputeProperties(const Fst<Arc> &fst, uint64 mask, uint64 *known,
         }
       }
     }
-    if (fst.Start() != kNoStateId && fst.Start() != 0) {
+    if (fst.Start() != static_cast<StateId>(kNoStateId) && fst.Start() != 0) {
       comp_props |= kNotString;
       comp_props &= ~kString;
     }

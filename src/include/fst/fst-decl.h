@@ -139,7 +139,7 @@ class UnionFst;
 
 // Heap.
 
-template <class T, class Compare>
+template <class T, class Compare, typename ID = unsigned int>
 class Heap;
 
 // Compactors.

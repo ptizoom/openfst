@@ -133,17 +133,24 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
  public:
   using State = S;
   using Arc = typename State::Arc;
+  //using Label ATTRIBUTE_UNUSED = typename Arc::Label;
+  //PTZ180427 defined inside  FstImpl
+  // like typename fst::internal::FstImpl<typename FST::Arc>::StateId
   using StateId = typename Arc::StateId;
   using Weight = typename Arc::Weight;
 
+
+  
+ public:
   VectorFstBaseImpl() : start_(kNoStateId) {}
 
   ~VectorFstBaseImpl() override {
-      for (StateId s = 0; (size_t)s < states_.size(); ++s)
+    for (StateId s = 0; (size_t) s < states_.size(); ++s) {
       State::Destroy(states_[s], &state_alloc_);
     }
   }
 
+ public:
   StateId Start() const { return start_; }
 
   Weight Final(StateId state) const { return states_[state]->Final(); }
@@ -183,7 +190,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
     for (StateId i = 0; i < dstates.size(); ++i) newid[dstates[i]] = kNoStateId;
     StateId nstates = 0;
     for (StateId state = 0; state < states_.size(); ++state) {
-      if (newid[state] != kNoStateId) {
+        if (newid[state] != static_cast<StateId>(kNoStateId)) {
         newid[state] = nstates;
         if (state != nstates) states_[nstates] = states_[state];
         ++nstates;
@@ -199,7 +206,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
       auto noeps = states_[state]->NumOutputEpsilons();
       for (size_t i = 0; i < states_[state]->NumArcs(); ++i) {
         const auto t = newid[arcs[i].nextstate];
-        if (t != kNoStateId) {
+        if (t != static_cast<StateId>(kNoStateId)) {
           arcs[i].nextstate = t;
           if (i != narcs) arcs[narcs] = arcs[i];
           ++narcs;
@@ -212,7 +219,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
       states_[state]->SetNumInputEpsilons(nieps);
       states_[state]->SetNumOutputEpsilons(noeps);
     }
-    if (Start() != kNoStateId) SetStart(newid[Start()]);
+    if (Start() != static_cast<StateId>(kNoStateId)) SetStart(newid[Start()]);
   }
 
   void DeleteStates() {
@@ -250,13 +257,13 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
     data->arcs = states_[state]->Arcs();
     data->ref_count = nullptr;
   }
-
  private:
   std::vector<State *> states_;                 // States represenation.
   StateId start_;                               // Initial state.
   typename State::StateAllocator state_alloc_;  // For state allocation.
   typename State::ArcAllocator arc_alloc_;      // For arc allocation.
 
+ private:
   VectorFstBaseImpl(const VectorFstBaseImpl &) = delete;
   VectorFstBaseImpl &operator=(const VectorFstBaseImpl &) = delete;
 };
@@ -531,7 +538,7 @@ bool VectorFst<Arc, State>::WriteFst(const FST &fst, std::ostream &strm,
   hdr.SetNumStates(kNoStateId);
   size_t start_offset = 0;
   if (fst.Properties(kExpanded, false) || opts.stream_write ||
-      (start_offset = strm.tellp()) != kNoStateId) {
+      (start_offset = strm.tellp()) != static_cast<StateId>(kNoStateId)) {
     hdr.SetNumStates(CountStates(fst));
     update_header = false;
   }

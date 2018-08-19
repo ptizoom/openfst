@@ -26,18 +26,21 @@ namespace fst {
 //
 // T: the element type of the hash. It can be POD, Data or a pointer to Data.
 // Compare: comparison functor for determining min-heapness.
-template <class T, class Compare>
+
+    //TODO:PTZ180527 this code does not respect undefined keys...
+    //add a typename  for indexes...
+    template <class T, class Compare, typename ID>
 class Heap {
  public:
   using Value = T;
-
-  static constexpr int kNoKey = -1;
+  
+  static constexpr size_t kNoKey = -1;
 
   // Initializes with a specific comparator.
   explicit Heap(Compare comp = Compare()) : comp_(comp), size_(0) {}
 
   // Inserts a value into the heap.
-  int Insert(const Value &value) {
+  unsigned int Insert(const Value &value) {
     if (size_ < values_.size()) {
       values_[size_] = value;
       pos_[key_[size_]] = size_;
@@ -54,7 +57,7 @@ class Heap {
   // indexed by the key. The position gives the position in the heap array.
   // Once we have the position we can then use the standard heap operations
   // to calculate the parent and child positions.
-  void Update(int key, const Value &value) {
+  void Update(ID key, const Value &value) {
     const auto i = pos_[key];
     const bool is_better = comp_(value, values_[Parent(i)]);
     values_[i] = value;
@@ -79,16 +82,16 @@ class Heap {
   const Value &Top() const { return values_.front(); }
 
   // Returns the element for the given key.
-  const Value &Get(int key) const { return values_[pos_[key]]; }
+  const Value &Get(ID key) const { return values_[pos_[key]]; }
 
   // Checks if the heap is empty.
   bool Empty() const { return size_ == 0; }
 
   void Clear() { size_ = 0; }
 
-  int Size() const { return size_; }
+  size_t Size() const { return size_; }
 
-  void Reserve(int size) {
+  void Reserve(ID size) {
     values_.reserve(size);
     pos_.reserve(size);
     key_.reserve(size);
@@ -101,17 +104,17 @@ class Heap {
   // for managing the heap and keeping the heap properties.
 
   // Computes left child of parent.
-  static int Left(int i) {
+  static ID Left(ID i) {
     return 2 * (i + 1) - 1;  // 0 -> 1, 1 -> 3
   }
 
   // Computes right child of parent.
-  static int Right(int i) {
+  static ID Right(ID i) {
     return 2 * (i + 1);  // 0 -> 2, 1 -> 4
   }
 
   // Given a child computes parent.
-  static int Parent(int i) {
+  static ID Parent(ID i) {
     return (i - 1) / 2;  // 0 -> 0, 1 -> 0, 2 -> 0,  3 -> 1,  4 -> 1, ...
   }
 
@@ -121,7 +124,7 @@ class Heap {
   // - the value
   // - the associated keys
   // - the position of the value in the heap
-  void Swap(int j, int k) {
+  void Swap(ID j, ID k) {
     const auto tkey = key_[j];
     pos_[key_[j] = key_[k]] = j;
     pos_[key_[k] = tkey] = k;
@@ -130,7 +133,7 @@ class Heap {
   }
 
   // Heapifies the subtree rooted at index i.
-  void Heapify(int i) {
+  void Heapify(ID i) {
     const auto l = Left(i);
     const auto r = Right(i);
     auto largest = (l < size_ && comp_(values_[l], values_[i])) ? l : i;
@@ -142,8 +145,8 @@ class Heap {
   }
 
   // Inserts (updates) element at subtree rooted at index i.
-  int Insert(const Value &value, int i) {
-    int p;
+  ID Insert(const Value &value, ID i) {
+    ID p;
     while (i > 0 && !comp_(values_[p = Parent(i)], value)) {
       Swap(i, p);
       i = p;
@@ -154,14 +157,14 @@ class Heap {
  private:
   const Compare comp_;
 
-  std::vector<int> pos_;
-  std::vector<int> key_;
+  std::vector<ID> pos_;
+  std::vector<ID> key_;
   std::vector<Value> values_;
-  int size_;
+  size_t size_;
 };
 
-template <class T, class Compare>
-constexpr int Heap<T, Compare>::kNoKey;
+template <class T, class Compare, typename ID>
+    constexpr size_t Heap<T, Compare, ID>::kNoKey;
 
 }  // namespace fst
 

@@ -192,7 +192,7 @@ template <class Arc, class Queue>
 void RmEpsilon(MutableFst<Arc> *fst,
                std::vector<typename Arc::Weight> *distance,
                const RmEpsilonOptions<Arc, Queue> &opts) {
-  using Label = typename Arc::Label;
+  using Label ATTRIBUTE_UNUSED = typename Arc::Label;
   using StateId = typename Arc::StateId;
   using Weight = typename Arc::Weight;
   if (fst->Start() == kNoStateId) return;
