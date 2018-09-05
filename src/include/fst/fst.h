@@ -182,8 +182,9 @@ enum MatchType {
   MATCH_UNKNOWN = 5
 };  // Otherwise, match type unknown.
 
-constexpr int kNoLabel = -1;    // Not a valid label.
-constexpr int kNoStateId = -1;  // Not a valid state ID.
+//TODO::PTZ180827 size_t, max-size should be ok, but matcher.h will overflow
+constexpr unsigned int kNoLabel = -1;    // Not a valid label.
+constexpr unsigned int kNoStateId = -1;  // Not a valid state ID.
 
 // A generic FST, templated on the arc definition, with common-demoninator
 // methods (use StateIterator and ArcIterator to iterate over its states and
@@ -629,8 +630,9 @@ template <class Arc>
 inline size_t NumOutputEpsilons(const Fst<Arc> &fst, typename Arc::StateId s) {
   return fst.NumOutputEpsilons(s);
 }
-#if 0
-//PTZ180525
+//PTZ180827 it is internal after all!
+#if 1
+//PTZ180525 0 ed
 // A useful alias when using StdArc.
 typedef Fst<StdArc> StdFst;
 
@@ -638,8 +640,8 @@ typedef Fst<StdArc> StdFst;
 //  CONSTANT DEFINITIONS
 //
 
-const size_t kNoStateId = UINT_MAX;  // Not a valid state ID
-const int kNoLabel = -1;    // Not a valid label
+const unsigned int kNoStateId = UINT_MAX;  // Not a valid state ID
+const unsigned int kNoLabel = -1;    // Not a valid label
 
 #endif
 
