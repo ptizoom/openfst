@@ -48,7 +48,7 @@ class ArcSortMapper {
 
   bool Done() const { return i_ >= arcs_.size(); }
   const Arc &Value() const { return arcs_[i_]; }
-  void Next() { ++i_; }
+  void Next() { ++i_; } //PTZ180914 should it be capped?
 
   MapSymbolsAction InputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
   MapSymbolsAction OutputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
@@ -58,7 +58,8 @@ class ArcSortMapper {
   const Fst<Arc> &fst_;
   const Compare &comp_;
   std::vector<Arc> arcs_;
-  ssize_t i_;  // current arc position
+  //PTZ180914 ssize_t why to sign it?
+  std::size_t i_;  // current arc position
 
   void operator=(const ArcSortMapper<Arc, Compare> &);  // disallow
 };

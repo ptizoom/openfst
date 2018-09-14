@@ -26,6 +26,9 @@ namespace fst {
 //
 // T: the element type of the hash, can be POD, Data or Ptr to Data
 // Compare: comparison class for determining min-heapness.
+//
+// PTZ180914 put indexes container to size_t , hence probably to get maximum system indexing capacity.
+//
 template <class T, class Compare>
 class Heap {
  public:
@@ -39,7 +42,7 @@ class Heap {
   Heap() : size_(0) {}
 
   // Inserts a value into the heap.
-  int Insert(const Value& val) {
+  std::size_t Insert(const Value& val) {
     if (size_ < values_.size()) {
       values_[size_] = val;
       pos_[key_[size_]] = size_;
@@ -56,8 +59,8 @@ class Heap {
   // indexed by the key. The position gives the position in the heap array.
   // Once we have the position we can then use the standard heap operations
   // to calculate the parent and child positions.
-  void Update(int key, const Value& val) {
-    const int i = pos_[key];
+  void Update(std::size_t key, const Value& val) {
+    const std::size_t i = pos_[key];
     const bool is_better = comp_(val, values_[Parent(i)]);
     values_[i] = val;
     if (is_better) {
@@ -84,7 +87,7 @@ class Heap {
   }
 
   // Returns the element for the given key.
-  const Value& Get(int key) const {
+  const Value& Get(std::size_t key) const {
     return values_[pos_[key]];
   }
 
@@ -97,11 +100,11 @@ class Heap {
     size_ = 0;
   }
 
-  int Size() const {
+  std::size_t Size() const {
     return size_;
   }
 
-  void Reserve(int size) {
+  void Reserve(std::size_t size) {
     values_.reserve(size);
     pos_.reserve(size);
     key_.reserve(size);
@@ -112,17 +115,17 @@ class Heap {
   // for managing the heap and keeping the heap properties.
 
   // Computes left child of parent.
-  static int Left(int i) {
+  static std::size_t Left(std::size_t i) {
     return 2 * (i + 1) - 1;  // 0 -> 1, 1 -> 3
   }
 
   // Computes right child of parent.
-  static int Right(int i) {
+  static std::size_t Right(std::size_t i) {
     return 2 * (i + 1);  // 0 -> 2, 1 -> 4
   }
 
   // Given a child computes parent.
-  static int Parent(int i) {
+  static std::size_t Parent(std::size_t i) {
     return (i - 1) / 2;  // 0 -> 0, 1 -> 0, 2 -> 0,  3 -> 1,  4 -> 1, ...
   }
 
@@ -131,8 +134,8 @@ class Heap {
   //   the value
   //   the associated keys
   //   the position of the value in the heap
-  void Swap(int j, int k) {
-    const int tkey = key_[j];
+  void Swap(std::size_t j, std::size_t k) {
+    const std::size_t tkey = key_[j];
     pos_[key_[j] = key_[k]] = j;
     pos_[key_[k] = tkey] = k;
 
@@ -141,10 +144,10 @@ class Heap {
   }
 
   // Heapifies subtree rooted at index i.
-  void Heapify(int i) {
-    const int l = Left(i);
-    const int r = Right(i);
-    int largest = (l < size_ && comp_(values_[l], values_[i])) ? l : i;
+  void Heapify(std::size_t i) {
+    const std::size_t l = Left(i);
+    const std::size_t r = Right(i);
+    std::size_t largest = (l < size_ && comp_(values_[l], values_[i])) ? l : i;
     if (r < size_ && comp_(values_[r], values_[largest]) )
       largest = r;
 
@@ -155,8 +158,8 @@ class Heap {
   }
 
   // Inserts (updates) element at subtree rooted at index i.
-  int Insert(const Value& val, int i) {
-    int p;
+  std::size_t Insert(const Value& val, std::size_t i) {
+    std::size_t p;
     while (i > 0 && !comp_(values_[p = Parent(i)], val)) {
       Swap(i, p);
       i = p;
@@ -167,10 +170,11 @@ class Heap {
  private:
   Compare comp_;
 
-  std::vector<int> pos_;
-  std::vector<int> key_;
+  std::vector<std::size_t> pos_;
+  std::vector<std::size_t> key_;
   std::vector<Value> values_;
-  int size_;
+  //PTZ180914 size_t is better than int ?static_cast<>(
+  std::size_t size_;
 };
 
 }  // namespace fst
