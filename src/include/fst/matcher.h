@@ -139,6 +139,11 @@ class MatcherBase {
 // Arc(0, kNoLabel, Weight::One(), current_state) is instead matched.
 template <class F>
 class SortedMatcher : public MatcherBase<typename F::Arc> {
+
+  //PTZ180914 kNoLabel could be -1 on 64 bits while Label on 32, 16, 8,
+  //thus compiler needs to reajust correct number of bits on the constant.
+  // using kNoLabel static_cast< Arc::Label >(kNoLabel);
+
  public:
   typedef F FST;
   typedef typename F::Arc Arc;
@@ -231,9 +236,11 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
       current_loop_ = false;
       match_label_ = kNoLabel;
       return false;
-    }
+    } 
     current_loop_ = match_label == 0;
-    match_label_ = match_label == kNoLabel ? 0 : match_label;
+    //PTZ180914 kNoLabel could be -1 on 64 bits while Label on 32, 16, 8,
+    //thus compiler needs to reajust correct number of bits on the constant.
+    match_label_ = match_label == static_cast< Label >(kNoLabel)  ? 0 : match_label;
     if (Search()) {
       return true;
     } else {

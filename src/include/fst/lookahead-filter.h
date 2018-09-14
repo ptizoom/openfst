@@ -263,8 +263,11 @@ class LookAheadComposeFilter {
  private:
   FilterState LookAheadFilterArc(Arc *arca, Arc *arcb,
                                  const FilterState &f) const {
-    Label &labela = LookAheadOutput() ? arca->olabel : arca->ilabel;
-
+    //PTZ180914 why Label &? it is an atom anyhow.
+    Label labela = (LookAheadOutput()
+		     ? arca->olabel
+		     : arca->ilabel);
+    //TODO:PTZ180914 kNoLabel io 0 ???
     if (labela != 0 && !(flags_ & kLookAheadNonEpsilons)) return f;
     if (labela == 0 && !(flags_ & kLookAheadEpsilons)) return f;
 

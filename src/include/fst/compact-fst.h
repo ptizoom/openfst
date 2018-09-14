@@ -440,7 +440,8 @@ class CompactFstImpl : public CacheImpl<A> {
   typedef typename C::Element CompactElement;
   typedef U Unsigned;
   typedef S DataStorage;
-
+  typedef typename A::Label Label;
+  
   CompactFstImpl()
       : CacheImpl<A>(CompactFstOptions()),
         compactor_(),
@@ -555,7 +556,7 @@ class CompactFstImpl : public CacheImpl<A> {
           ComputeArc(s, i, output_epsilons ? kArcOLabelValue : kArcILabelValue);
       const typename A::Label &label =
           (output_epsilons ? arc.olabel : arc.ilabel);
-      if (label == kNoLabel)
+      if (label == static_cast< typename A::Label >(kNoLabel)) //PTZ180914 
         continue;
       else if (label > 0)
         break;
