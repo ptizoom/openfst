@@ -438,13 +438,23 @@ class LabelReachable {
   }
 
   void FindIntervals(StateId ins) {
-    StateReachable<A, Label, LabelIntervalSet> state_reachable(*fst_);
+    //PTZ191107 here state index is mixed with label index...
+    // quite wrongly!!!
+    // like in StateReachable::AcyclicStateReachable(const Fst<A> &fst) {
+    // IntervalReachVisitor<Arc, typename Arc::StateId, IndexIntervalSet>
+    //StateReachable<A, Label, LabelIntervalSet> state_reachable(*fst_);
+    StateReachable<A, StateId, LabelIntervalSet> state_reachable(*fst_);
+
+
+
     if (state_reachable.Error()) {
       error_ = true;
       return;
     }
 
-    std::vector<Label> &state2index = state_reachable.State2Index();
+    //PTZ191107 here state index is mixed with label index...
+    // std::vector<Label> &state2index = state_reachable.State2Index();
+    std::vector<StateId> &state2index = state_reachable.State2Index();
     std::vector<LabelIntervalSet> &isets = *data_->MutableIntervalSets();
     isets = state_reachable.IntervalSets();
     isets.resize(ins);

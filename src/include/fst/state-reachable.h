@@ -168,6 +168,7 @@ class StateReachable {
 
  private:
   void AcyclicStateReachable(const Fst<A> &fst) {
+    //TODO:PTZ191107 maybe Label could be used instead of StateId...?
     IntervalReachVisitor<Arc, typename Arc::StateId, IndexIntervalSet>
         reach_visitor(fst, &isets_, &state2index_);
     DfsVisit(fst, &reach_visitor);
