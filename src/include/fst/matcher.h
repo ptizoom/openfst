@@ -175,9 +175,9 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
         aiter_(nullptr),
         match_type_(match_type),
         binary_label_(binary_label),
-        match_label_(kNoLabel),
+        match_label_(static_cast<Label>(kNoLabel)),
         narcs_(0),
-        loop_(kNoLabel, 0, Weight::One(), kNoStateId),
+        loop_(static_cast<Label>(kNoLabel), 0, Weight::One(), kNoStateId),
         error_(false),
         aiter_pool_(1) {
     switch (match_type_) {
@@ -202,7 +202,7 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
         aiter_(nullptr),
         match_type_(matcher.match_type_),
         binary_label_(matcher.binary_label_),
-        match_label_(kNoLabel),
+        match_label_(static_cast<Label>(kNoLabel)),
         narcs_(0),
         loop_(matcher.loop_),
         error_(matcher.error_),
@@ -248,7 +248,7 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
     exact_match_ = true;
     if (error_) {
       current_loop_ = false;
-      match_label_ = kNoLabel;
+      match_label_ = static_cast<Label>(kNoLabel);
       return false;
     }
     current_loop_ = match_label == 0;
@@ -1346,8 +1346,8 @@ class MultiEpsMatcher {
   bool own_matcher_;  // Does this class delete the matcher?
 
   // Multi-eps label set.
-  CompactSet<Label, kNoLabel> multi_eps_labels_;
-  typename CompactSet<Label, kNoLabel>::const_iterator multi_eps_iter_;
+  CompactSet<Label,  static_cast<Label>(kNoLabel)> multi_eps_labels_;
+  typename CompactSet<Label, static_cast<Label>(kNoLabel)>::const_iterator multi_eps_iter_;
 
   bool current_loop_;  // Current arc is the implicit loop?
   mutable Arc loop_;   // For non-consuming symbols.

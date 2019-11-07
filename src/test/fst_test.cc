@@ -53,7 +53,7 @@ class CustomCompactor {
   }
 
   Arc Expand(StateId s, const Element &p, uint32 f = kArcValueFlags) const {
-    return p.first == kNoLabel ? Arc(kNoLabel, kNoLabel, p.second, kNoStateId)
+    return p.first == kNoLabel ? Arc(static_cast<Label>(kNoLabel), static_cast<Label>(kNoLabel), p.second, kNoStateId)
                                : Arc(p.first, 0, p.second, s);
   }
 

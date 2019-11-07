@@ -79,9 +79,9 @@ class FstTester {
       CHECK_EQ(fst.NumInputEpsilons(s), 0);
       CHECK_EQ(fst.NumOutputEpsilons(s), s);
       CHECK(!matcher.Find(s + 1));     // out-of-range
-      CHECK(!matcher.Find(kNoLabel));  // no explicit epsilons
+      CHECK(!matcher.Find(static_cast<Label>(kNoLabel)));  // no explicit epsilons
       CHECK(matcher.Find(0));
-      CHECK_EQ(matcher.Value().ilabel, kNoLabel);  // implicit epsilon loop
+      CHECK_EQ(matcher.Value().ilabel, static_cast<Label>(kNoLabel));  // implicit epsilon loop
       ++ns;
     }
     CHECK(fst.Properties(kNotAcceptor, true));

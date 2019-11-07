@@ -170,8 +170,8 @@ class StateReachable {
 
  private:
   void AcyclicStateReachable(const Fst<Arc> &fst) {
-    IntervalReachVisitor<Arc, StateId, ISet> reach_visitor(fst, &isets_,
-                                                           &state2index_);
+    IntervalReachVisitor<Arc, I, ISet>
+      reach_visitor(fst, &isets_, &state2index_);
     DfsVisit(fst, &reach_visitor);
     if (reach_visitor.Error()) error_ = true;
   }

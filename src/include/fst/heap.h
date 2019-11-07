@@ -59,7 +59,7 @@ class Heap {
   // indexed by the key. The position gives the position in the heap array.
   // Once we have the position we can then use the standard heap operations
   // to calculate the parent and child positions.
-  void Update(ID key, const Value &value) {
+  void Update(ID key, const Value &val) {
     const auto i = pos_[key];
     const bool is_better = comp_(val, values_[Parent(i)]);
     values_[i] = val;
