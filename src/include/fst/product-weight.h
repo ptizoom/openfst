@@ -3,8 +3,8 @@
 //
 // Product weight set and associated semiring operation definitions.
 
-#ifndef FST_LIB_PRODUCT_WEIGHT_H_
-#define FST_LIB_PRODUCT_WEIGHT_H_
+#ifndef FST_PRODUCT_WEIGHT_H_
+#define FST_PRODUCT_WEIGHT_H_
 
 #include <string>
 #include <utility>
@@ -46,8 +46,9 @@ class ProductWeight : public PairWeight<W1, W2> {
   }
 
   static const string &Type() {
-    static const string type = W1::Type() + "_X_" + W2::Type();
-    return type;
+    static const string *const type =
+        new string(W1::Type() + "_X_" + W2::Type());
+    return *type;
   }
 
   static constexpr uint64 Properties() {
@@ -103,4 +104,4 @@ class WeightGenerate<ProductWeight<W1, W2>> :
 
 }  // namespace fst
 
-#endif  // FST_LIB_PRODUCT_WEIGHT_H_
+#endif  // FST_PRODUCT_WEIGHT_H_

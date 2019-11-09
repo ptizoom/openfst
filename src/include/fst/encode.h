@@ -3,8 +3,8 @@
 //
 // Class to encode and decode an FST.
 
-#ifndef FST_LIB_ENCODE_H_
-#define FST_LIB_ENCODE_H_
+#ifndef FST_ENCODE_H_
+#define FST_ENCODE_H_
 
 #include <iostream>
 #include <memory>
@@ -321,7 +321,7 @@ class EncodeMapper {
   }
 
   bool Write(const string &filename) const {
-    std::ofstream strm(filename.c_str(),
+    std::ofstream strm(filename,
                              std::ios_base::out | std::ios_base::binary);
     if (!strm) {
       LOG(ERROR) << "EncodeMap: Can't open file: " << filename;
@@ -338,7 +338,7 @@ class EncodeMapper {
 
   static EncodeMapper<Arc> *Read(const string &filename,
                                  EncodeType type = ENCODE) {
-    std::ifstream strm(filename.c_str(),
+    std::ifstream strm(filename,
                             std::ios_base::in | std::ios_base::binary);
     if (!strm) {
       LOG(ERROR) << "EncodeMap: Can't open file: " << filename;
@@ -553,4 +553,4 @@ using StdDecodeFst = DecodeFst<StdArc>;
 
 }  // namespace fst
 
-#endif  // FST_LIB_ENCODE_H_
+#endif  // FST_ENCODE_H_

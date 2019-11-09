@@ -1,14 +1,15 @@
 // See www.openfst.org for extensive documentation on this weighted
 // finite-state transducer library.
 
-#ifndef FST_LIB_MAPPED_FILE_H_
-#define FST_LIB_MAPPED_FILE_H_
+#ifndef FST_MAPPED_FILE_H_
+#define FST_MAPPED_FILE_H_
 
 #include <cstddef>
 #include <istream>
 #include <string>
 
 #include <fst/compat.h>
+#include <fst/flags.h>
 
 namespace fst {
 
@@ -34,7 +35,7 @@ class MappedFile {
 
   const void *data() const { return region_.data; }
 
-  // Returns a MappedFile object that contains the contents of the input strea
+  // Returns a MappedFile object that contains the contents of the input stream
   // strm starting from the current file position with size bytes. The memorymap
   // bool is advisory, and Map will default to allocating and reading. The
   // source argument needs to contain the filename that was used to open the
@@ -71,4 +72,4 @@ class MappedFile {
 };
 }  // namespace fst
 
-#endif  // FST_LIB_MAPPED_FILE_H_
+#endif  // FST_MAPPED_FILE_H_

@@ -3,8 +3,8 @@
 //
 // Classes to provide symbol-to-integer and integer-to-symbol mappings.
 
-#ifndef FST_LIB_SYMBOL_TABLE_H_
-#define FST_LIB_SYMBOL_TABLE_H_
+#ifndef FST_SYMBOL_TABLE_H_
+#define FST_SYMBOL_TABLE_H_
 
 #include <cstring>
 #include <functional>
@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <fst/compat.h>
+#include <fst/flags.h>
 #include <fst/log.h>
 #include <fstream>
 #include <map>
@@ -24,6 +25,8 @@
 DECLARE_bool(fst_compat_symbols);
 
 namespace fst {
+
+constexpr size_t kNoSymbol = -1;
 
 // WARNING: Reading via symbol table read options should
 //          not be used. This is a temporary work around for
@@ -92,7 +95,7 @@ class DenseSymbolMap {
 
 class SymbolTableImpl {
  public:
-  static constexpr size_t kNoSymbol = -1;
+  //PTZ191109 static constexpr size_t kNoSymbol = -1;
 
   explicit SymbolTableImpl(const string &name)
       : name_(name),
@@ -142,8 +145,8 @@ class SymbolTableImpl {
     return symbols_.GetSymbol(idx);
   }
 
-  // Returns the key associated with the symbol. If the symbol
-  // does not exists, return SymbolTable::kNoSymbol.
+  // Returns the key associated with the symbol; if the symbol
+  // does not exists, returns kNoSymbol.
   size_t Find(const string &symbol) const {
     size_t idx = symbols_.Find(symbol);
     if (idx == kNoSymbol || idx < dense_key_limit_) return idx;
@@ -164,12 +167,12 @@ class SymbolTableImpl {
 
   void SetName(const string &new_name) { name_ = new_name; }
 
-  string CheckSum() const {
+  const string &CheckSum() const {
     MaybeRecomputeCheckSum();
     return check_sum_string_;
   }
 
-  string LabeledCheckSum() const {
+  const string &LabeledCheckSum() const {
     MaybeRecomputeCheckSum();
     return labeled_check_sum_string_;
   }
@@ -217,35 +220,25 @@ class SymbolTableImpl {
 // table with the lexical representation L o G.
 class SymbolTable {
  public:
-  static constexpr size_t kNoSymbol = -1;
-
-  // Constructs symbol table with an unspecified name.
-  SymbolTable() :
-      impl_(std::make_shared<internal::SymbolTableImpl>("<unspecified>")) {}
-
-  // Constructs symbol table with a unique name.
-  explicit SymbolTable(const string &name)
+  // Constructs symbol table with an optional name.
+  explicit SymbolTable(const string &name = "<unspecified>")
       : impl_(std::make_shared<internal::SymbolTableImpl>(name)) {}
 
   virtual ~SymbolTable() {}
 
   // Reads a text representation of the symbol table from an istream. Pass a
   // name to give the resulting SymbolTable.
-  static SymbolTable* ReadText(std::istream &strm,
-      const string &name,
+  static SymbolTable *ReadText(
+      std::istream &strm, const string &name,
       const SymbolTableTextOptions &opts = SymbolTableTextOptions()) {
     auto *impl = internal::SymbolTableImpl::ReadText(strm, name, opts);
-    if (!impl) {
-      return nullptr;
-    } else {
-      return new SymbolTable(impl);
-    }
+    return impl ? new SymbolTable(impl) : nullptr;
   }
 
   // Reads a text representation of the symbol table.
   static SymbolTable *ReadText(const string &filename,
       const SymbolTableTextOptions &opts = SymbolTableTextOptions()) {
-    std::ifstream strm(filename.c_str(), std::ios_base::in);
+    std::ifstream strm(filename, std::ios_base::in);
     if (!strm.good()) {
       LOG(ERROR) << "SymbolTable::ReadText: Can't open file " << filename;
       return nullptr;
@@ -271,7 +264,7 @@ class SymbolTable {
 
   // Reads a binary dump of the symbol table.
   static SymbolTable *Read(const string& filename) {
-    std::ifstream strm(filename.c_str(),
+    std::ifstream strm(filename,
                             std::ios_base::in | std::ios_base::binary);
     if (!strm.good()) {
       LOG(ERROR) << "SymbolTable::Read: Can't open file " << filename;
@@ -302,7 +295,7 @@ class SymbolTable {
 
   // Adds another symbol table to this table. All key values will be offset
   // by the current available key (highest key value in the symbol table).
-  // Note string symbols with the same key value with still have the same
+  // Note string symbols with the same key value will still have the same
   // key value after the symbol table has been merged, but a different
   // value. Adding symbol tables do not result in changes in the base table.
   virtual void AddTable(const SymbolTable &table);
@@ -321,17 +314,19 @@ class SymbolTable {
     impl_->SetName(new_name);
   }
 
-  // Return the label-agnostic MD5 check-sum for this table.  All new symbols
+  // Return the label-agnostic MD5 check-sum for this table. All new symbols
   // added to the table will result in an updated checksum. Deprecated.
-  virtual string CheckSum() const { return impl_->CheckSum(); }
+  virtual const string &CheckSum() const { return impl_->CheckSum(); }
 
   // Same as CheckSum(), but returns an label-dependent version.
-  virtual string LabeledCheckSum() const { return impl_->LabeledCheckSum(); }
+  virtual const string &LabeledCheckSum() const {
+    return impl_->LabeledCheckSum();
+  }
 
   virtual bool Write(std::ostream &strm) const { return impl_->Write(strm); }
 
   bool Write(const string &filename) const {
-    std::ofstream strm(filename.c_str(),
+    std::ofstream strm(filename,
                              std::ios_base::out | std::ios_base::binary);
     if (!strm.good()) {
       LOG(ERROR) << "SymbolTable::Write: Can't open file " << filename;
@@ -354,16 +349,16 @@ class SymbolTable {
     return WriteText(strm);
   }
 
-  // Returns the string associated with the key. If the key is out of
+  // Returns the string associated with the key; if the key is out of
   // range (<0, >max), returns an empty string.
   virtual string Find(size_t key) const { return impl_->Find(key); }
 
-  // Returns the key associated with the symbol. If the symbol does not exist,
-  // SymbolTable::kNoSymbol is returned.
+  // Returns the key associated with the symbol; if the symbol does not exist,
+  // kNoSymbol is returned.
   virtual size_t Find(const string &symbol) const { return impl_->Find(symbol); }
 
-  // Returns the key associated with the symbol. If the symbol does not exist,
-  // SymbolTable::kNoSymbol is returned.
+  // Returns the key associated with the symbol; if the symbol does not exist,
+  // kNoSymbol is returned.
   virtual size_t Find(const char *symbol) const { return impl_->Find(symbol); }
 
   virtual bool Member(size_t key) const { return impl_->Member(key); }
@@ -464,4 +459,4 @@ SymbolTable *StringToSymbolTable(const string &str);
 
 }  // namespace fst
 
-#endif  // FST_LIB_SYMBOL_TABLE_H_
+#endif  // FST_SYMBOL_TABLE_H_

@@ -5,8 +5,8 @@
 // implement project/invert. Consider using when operation does
 // not change the number of arcs (except possibly superfinal arcs).
 
-#ifndef FST_LIB_ARC_MAP_H_
-#define FST_LIB_ARC_MAP_H_
+#ifndef FST_ARC_MAP_H_
+#define FST_ARC_MAP_H_
 
 #include <string>
 #include <unordered_map>
@@ -719,8 +719,21 @@ class SuperFinalMapper {
  public:
   using FromArc = A;
   using ToArc = A;
+  using Label = typename FromArc::Label;
+  using Weight = typename FromArc::Weight;;
 
-  ToArc operator()(const FromArc &arc) const { return arc; }
+  // Arg allows setting super-final label.
+  explicit SuperFinalMapper(Label final_label = 0)
+      : final_label_(final_label) {}
+
+  ToArc operator()(const FromArc &arc) const {
+    // Super-final arc.
+    if (arc.nextstate == kNoStateId && arc.weight != Weight::Zero()) {
+      return ToArc(final_label_, final_label_, arc.weight, kNoStateId);
+    } else {
+      return arc;
+    }
+  }
 
   constexpr MapFinalAction FinalAction() const {
     return MAP_REQUIRE_SUPERFINAL;
@@ -735,8 +748,16 @@ class SuperFinalMapper {
   }
 
   size_t Properties(size_t props) const {
-    return props & kAddSuperFinalProperties;
+    if (final_label_ == 0) {
+      return props & kAddSuperFinalProperties;
+    } else {
+      return props & kAddSuperFinalProperties &
+          kILabelInvariantProperties & kOLabelInvariantProperties;
+    }
   }
+
+ private:
+  Label final_label_;
 };
 
 // Mapper that leaves labels and nextstate unchanged and constructs a new weight
@@ -801,7 +822,7 @@ class ToGallicMapper {
   using FromArc = A;
   using ToArc = GallicArc<A, G>;
 
-  using SW = StringWeight<typename A::Label, GALLIC_STRING_TYPE(G)>;
+  using SW = StringWeight<typename A::Label, GallicStringType(G)>;
   using AW = typename FromArc::Weight;
   using GW = typename ToArc::Weight;
 
@@ -894,10 +915,10 @@ class FromGallicMapper {
   template <GallicType GT>
   static bool Extract(const GallicWeight<Label, AW, GT> &gallic_weight,
                       typename A::Weight *weight, typename A::Label *label) {
-    const StringWeight<Label, GALLIC_STRING_TYPE(GT)> &w1 =
-        gallic_weight.Value1();
+    using GW = StringWeight<Label, GallicStringType(GT)>;
+    const GW &w1 = gallic_weight.Value1();
     const AW &w2 = gallic_weight.Value2();
-    StringWeightIterator<Label, GALLIC_STRING_TYPE(GT)> iter1(w1);
+    typename GW::Iterator iter1(w1);
     const Label l = w1.Size() == 1 ? iter1.Value() : 0;
     if (l == kStringInfinity || l == kStringBad || w1.Size() > 1) return false;
     *label = l;
@@ -931,7 +952,7 @@ class GallicToNewSymbolsMapper {
   using StateId = typename ToArc::StateId;
   using AW = typename ToArc::Weight;
   using GW = typename FromArc::Weight;
-  using SW = StringWeight<Label, GALLIC_STRING_TYPE(G)>;
+  using SW = StringWeight<Label, GallicStringType(G)>;
 
   explicit GallicToNewSymbolsMapper(MutableFst<ToArc> *fst)
       : fst_(fst),
@@ -947,7 +968,7 @@ class GallicToNewSymbolsMapper {
       string name = osymbols_->Name() + "_from_gallic";
       fst_->SetInputSymbols(new SymbolTable(name));
       isymbols_ = fst_->MutableInputSymbols();
-      const ssize_t zero = 0;
+      const size_t zero = 0;
       isymbols_->AddSymbol(osymbols_->Find(zero), 0);
     } else {
       fst_->SetInputSymbols(nullptr);
@@ -971,7 +992,7 @@ class GallicToNewSymbolsMapper {
       } else {
         l = ++lmax_;
         insert_result.first->second = l;
-        StringWeightIterator<Label, GALLIC_STRING_TYPE(G)> iter1(w1);
+        StringWeightIterator<SW> iter1(w1);
         StateId n;
         string s;
         for (size_t i = 0, p = state_; i < w1.Size();
@@ -1026,6 +1047,9 @@ class GallicToNewSymbolsMapper {
   SymbolTable *isymbols_;
   mutable bool error_;
 };
+
+// TODO(kbg): Add common base class for those mappers which do nothing except
+// mutate their weights.
 
 // Mapper to add a constant to all weights.
 template <class A>
@@ -1095,7 +1119,11 @@ class TimesMapper {
   const Weight weight_;
 };
 
-// Mapper to take all arc-weights to a fixed power.
+// Mapper to take all weights to a constant power. The power argument is stored
+// as a double, so if there is a floating-point power implementation for this
+// weight type, it will take precedence. Otherwise, the power argument's 53 bits
+// of integer precision will be implicitly converted to a size_t and the default
+// power implementation (iterated multiplication) will be used instead.
 template <class A>
 class PowerMapper {
  public:
@@ -1103,25 +1131,29 @@ class PowerMapper {
   using ToArc = A;
   using Weight = typename FromArc::Weight;
 
-  explicit PowerMapper(size_t power) : power_(power) {}
+  explicit PowerMapper(double power) : power_(power) {}
 
   ToArc operator()(const FromArc &arc) const {
     return ToArc(arc.ilabel, arc.olabel, Power(arc.weight, power_),
                  arc.nextstate);
   }
 
-  MapFinalAction FinalAction() const { return MAP_NO_SUPERFINAL; }
+  constexpr MapFinalAction FinalAction() const { return MAP_NO_SUPERFINAL; }
 
-  MapSymbolsAction InputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
+  constexpr MapSymbolsAction InputSymbolsAction() const {
+    return MAP_COPY_SYMBOLS;
+  }
 
-  MapSymbolsAction OutputSymbolsAction() const { return MAP_COPY_SYMBOLS; }
+  constexpr MapSymbolsAction OutputSymbolsAction() const {
+    return MAP_COPY_SYMBOLS;
+  }
 
   size_t Properties(size_t props) const {
     return props & kWeightInvariantProperties;
   }
 
  private:
-  size_t power_;
+  const double power_;
 };
 
 // Mapper to reciprocate all non-Zero() weights.
@@ -1252,4 +1284,4 @@ class ReverseWeightMapper {
 
 }  // namespace fst
 
-#endif  // FST_LIB_ARC_MAP_H_
+#endif  // FST_ARC_MAP_H_

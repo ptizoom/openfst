@@ -5,8 +5,8 @@
 //
 // TODO(riley): add in normalizer functor
 
-#ifndef FST_LIB_UNION_WEIGHT_H_
-#define FST_LIB_UNION_WEIGHT_H_
+#ifndef FST_UNION_WEIGHT_H_
+#define FST_UNION_WEIGHT_H_
 
 #include <cstdlib>
 
@@ -105,8 +105,8 @@ class UnionWeight {
   }
 
   static const string &Type() {
-    static const string type = W::Type() + "_union";
-    return type;
+    static const string *const type = new string(W::Type() + "_union");
+    return *type;
   }
 
   static constexpr uint64 Properties() {
@@ -502,4 +502,4 @@ class WeightGenerate<UnionWeight<W, O>> {
 
 }  // namespace fst
 
-#endif  // FST_LIB_UNION_WEIGHT_H_
+#endif  // FST_UNION_WEIGHT_H_

@@ -13,9 +13,9 @@
 #include <vector>
 
 #include <fst/compat.h>
-#include <fstream>
 #include <fst/extensions/compress/elias.h>
 #include <fst/extensions/compress/gzfile.h>
+#include <fstream>
 
 #include <fst/encode.h>
 #include <fst/expanded-fst.h>
@@ -33,6 +33,36 @@ static const int32 kGzipMagicNumber = 0x8b1f;
 // Selects the two most significant bytes.
 constexpr uint32 kGzipMask = 0xffffffff >> 16;
 
+namespace internal {
+
+// Expands a Lempel Ziv code and returns the set of code words. expanded_code[i]
+// is the i^th Lempel Ziv codeword.
+template <class Var, class Edge>
+bool ExpandLZCode(const std::vector<std::pair<Var, Edge>> &code,
+                  std::vector<std::vector<Edge>> *expanded_code) {
+  expanded_code->resize(code.size());
+  for (int i = 0; i < code.size(); ++i) {
+    if (code[i].first > i) {
+      LOG(ERROR) << "ExpandLZCode: Not a valid code";
+      return false;
+    }
+    if (code[i].first == 0) {
+      (*expanded_code)[i].resize(1, code[i].second);
+    } else {
+      (*expanded_code)[i].resize((*expanded_code)[code[i].first - 1].size() +
+                                 1);
+      std::copy((*expanded_code)[code[i].first - 1].begin(),
+                (*expanded_code)[code[i].first - 1].end(),
+                (*expanded_code)[i].begin());
+      (*expanded_code)[i][(*expanded_code)[code[i].first - 1].size()] =
+          code[i].second;
+    }
+  }
+  return true;
+}
+
+}  // namespace internal
+
 // Lempel Ziv on data structure Edge, with a less than operator
 // EdgeLessThan and an equals operator  EdgeEquals.
 // Edge has a value defaultedge which it never takes and
@@ -40,7 +70,7 @@ constexpr uint32 kGzipMask = 0xffffffff >> 16;
 template <class Var, class Edge, class EdgeLessThan, class EdgeEquals>
 class LempelZiv {
  public:
-  LempelZiv() : dict_number_(0) {
+  LempelZiv() : dict_number_(0), default_edge_() {
     root_.current_number = dict_number_++;
     root_.current_edge = default_edge_;
     decode_vector_.push_back(std::make_pair(0, default_edge_));
@@ -338,10 +368,13 @@ template <class Arc>
 void Compressor<Arc>::Preprocess(const Fst<Arc> &fst,
                                  MutableFst<Arc> *preprocessedfst,
                                  EncodeMapper<Arc> *encoder) {
-  std::vector<StateId> order;
   *preprocessedfst = fst;
+  if (!preprocessedfst->NumStates()) {
+    return;
+  }
   // Relabels the edges and develops a dictionary
   Encode(preprocessedfst, encoder);
+  std::vector<StateId> order;
   // Finds the BFS sorting order of the fst
   BfsOrder(*preprocessedfst, &order);
   // Reorders the states according to the BFS order
@@ -380,8 +413,7 @@ void Compressor<Arc>::EncodeProcessedFst(const ExpandedFst<Arc> &fst,
     }
 
     // Reading the states
-    for (ArcIterator<Fst<Arc>> aiter(fst, state); !aiter.Done();
-         aiter.Next()) {
+    for (ArcIterator<Fst<Arc>> aiter(fst, state); !aiter.Done(); aiter.Next()) {
       Arc arc = aiter.Value();
       if (arc.nextstate > seen_states) {  // RILEY: > or >= ?
         ++seen_states;
@@ -495,18 +527,20 @@ void Compressor<Arc>::DecodeProcessedFst(const std::vector<StateId> &input,
   Transition default_transition;
   StateId seen_states = 1;
 
-  // Adding states
-
-  for (StateId temp_integer = 0; temp_integer < input.front(); ++temp_integer) {
-    fst->AddState();
+  // Adding states.
+  const StateId num_states = input.front();
+  if (num_states > 0) {
+    const StateId start_state = fst->AddState();
+    fst->SetStart(start_state);
+    for (StateId state = 1; state < num_states; ++state) {
+      fst->AddState();
+    }
   }
 
-  fst->SetStart(0);
   typename std::vector<StateId>::const_iterator main_it = input.begin();
   ++main_it;
 
-  for (StateId current_state = 0; current_state < input.front();
-       ++current_state) {
+  for (StateId current_state = 0; current_state < num_states; ++current_state) {
     if (current_state >= seen_states) ++seen_states;
     current_new_input.clear();
     current_new_output.clear();
@@ -795,7 +829,7 @@ bool Compress(const Fst<Arc> &fst, const string &file_name,
     } else {
       std::stringstream strm;
       Compress(fst, strm);
-      OGzFile gzfile(file_name.c_str());
+      OGzFile gzfile(file_name);
       if (!gzfile) {
         LOG(ERROR) << "Compress: Can't open file: " << file_name;
         return false;
@@ -809,7 +843,7 @@ bool Compress(const Fst<Arc> &fst, const string &file_name,
   } else if (file_name.empty()) {
     Compress(fst, std::cout);
   } else {
-    std::ofstream strm(file_name.c_str(),
+    std::ofstream strm(file_name,
                              std::ios_base::out | std::ios_base::binary);
     if (!strm) {
       LOG(ERROR) << "Compress: Can't open file: " << file_name;
@@ -840,7 +874,7 @@ bool Decompress(const string &file_name, MutableFst<Arc> *fst,
         return false;
       }
     } else {
-      IGzFile gzfile(file_name.c_str());
+      IGzFile gzfile(file_name);
       if (!gzfile) {
         LOG(ERROR) << "Decompress: Can't open file: " << file_name;
         return false;
@@ -854,7 +888,7 @@ bool Decompress(const string &file_name, MutableFst<Arc> *fst,
   } else if (file_name.empty()) {
     Decompress(std::cin, "stdin", fst);
   } else {
-    std::ifstream strm(file_name.c_str(),
+    std::ifstream strm(file_name,
                             std::ios_base::in | std::ios_base::binary);
     if (!strm) {
       LOG(ERROR) << "Decompress: Can't open file: " << file_name;

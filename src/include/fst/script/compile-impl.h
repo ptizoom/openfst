@@ -7,15 +7,15 @@
 #define FST_SCRIPT_COMPILE_IMPL_H_
 
 #include <iostream>
-#include <sstream>
 #include <memory>
+#include <sstream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include <fst/fst.h>
 #include <fst/util.h>
 #include <fst/vector-fst.h>
+#include <unordered_map>
 
 DECLARE_string(fst_field_separator);
 
@@ -74,8 +74,8 @@ class FstCompiler {
     while (istrm.getline(line, kLineLen)) {
       ++nline_;
       std::vector<char *> col;
-      SplitToVector(line, separator.c_str(), &col, true);
-      if (col.size() == 0 || col[0][0] == '\0')  // empty line
+      SplitString(line, separator.c_str(), &col, true);
+      if (col.empty() || col[0][0] == '\0')
         continue;
       if (col.size() > 5 || (col.size() > 4 && accep) ||
           (col.size() == 3 && !accep)) {

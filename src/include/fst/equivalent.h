@@ -3,8 +3,8 @@
 //
 // Functions and classes to determine the equivalence of two FSTs.
 
-#ifndef FST_LIB_EQUIVALENT_H_
-#define FST_LIB_EQUIVALENT_H_
+#ifndef FST_EQUIVALENT_H_
+#define FST_EQUIVALENT_H_
 
 #include <algorithm>
 #include <deque>
@@ -112,7 +112,7 @@ constexpr
 //        by 4 by all practical purposes.
 template <class Arc>
 bool Equivalent(const Fst<Arc> &fst1, const Fst<Arc> &fst2,
-                double delta = kDelta, bool *error = nullptr) {
+                float delta = kDelta, bool *error = nullptr) {
   using Weight = typename Arc::Weight;
   if (error) *error = false;
   // Check that the symbol table are compatible.
@@ -227,4 +227,4 @@ bool Equivalent(const Fst<Arc> &fst1, const Fst<Arc> &fst2,
 
 }  // namespace fst
 
-#endif  // FST_LIB_EQUIVALENT_H_
+#endif  // FST_EQUIVALENT_H_

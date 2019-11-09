@@ -14,8 +14,8 @@
 // ShortestDistance[Fst<ArcTpl<ExpectationWeight<P, V>>>]
 //    == < PosteriorProbability, Expected_Value[V] >
 
-#ifndef FST_LIB_EXPECTATION_WEIGHT_H_
-#define FST_LIB_EXPECTATION_WEIGHT_H_
+#ifndef FST_EXPECTATION_WEIGHT_H_
+#define FST_EXPECTATION_WEIGHT_H_
 
 #include <string>
 
@@ -73,8 +73,9 @@ class ExpectationWeight : public PairWeight<X1, X2> {
   }
 
   static const string &Type() {
-    static const string type = "expectation_" + X1::Type() + "_" + X2::Type();
-    return type;
+    static const string *const type =
+        new string("expectation_" + X1::Type() + "_" + X2::Type());
+    return *type;
   }
 
   PairWeight<X1, X2> Quantize(float delta = kDelta) const {
@@ -133,4 +134,4 @@ class WeightGenerate<ExpectationWeight<X1, X2>>
 
 }  // namespace fst
 
-#endif  // FST_LIB_EXPECTATION_WEIGHT_H_
+#endif  // FST_EXPECTATION_WEIGHT_H_

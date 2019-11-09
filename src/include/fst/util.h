@@ -3,8 +3,8 @@
 //
 // FST utility inline definitions.
 
-#ifndef FST_LIB_UTIL_H_
-#define FST_LIB_UTIL_H_
+#ifndef FST_UTIL_H_
+#define FST_UTIL_H_
 
 #include <iostream>
 #include <iterator>
@@ -23,6 +23,8 @@
 #include <fst/types.h>
 #include <fst/log.h>
 #include <fstream>
+
+#include <fst/flags.h>
 
 
 // Utility for error handling.
@@ -252,8 +254,6 @@ Weight StrToWeight(const string &s, const string &src, size_t nline) {
   return w;
 }
 
-void Int64ToStr(int64 n, string *s);
-
 template <typename Weight>
 void WeightToStr(Weight w, string *s) {
   std::ostringstream strm;
@@ -265,13 +265,13 @@ void WeightToStr(Weight w, string *s) {
 // Utilities for reading/writing integer pairs (typically labels)
 
 // Modifies line using a vector of pointers to a buffer beginning with line.
-void SplitToVector(char *line, const char *delim, std::vector<char *> *vec,
-                   bool omit_empty_strings);
+void SplitString(char *line, const char *delim, std::vector<char *> *vec,
+                 bool omit_empty_strings);
 
 template <typename I>
 bool ReadIntPairs(const string &filename, std::vector<std::pair<I, I>> *pairs,
                   bool allow_negative = false) {
-  std::ifstream strm(filename.c_str(), std::ios_base::in);
+  std::ifstream strm(filename, std::ios_base::in);
   if (!strm) {
     LOG(ERROR) << "ReadIntPairs: Can't open file: " << filename;
     return false;
@@ -283,7 +283,7 @@ bool ReadIntPairs(const string &filename, std::vector<std::pair<I, I>> *pairs,
   while (strm.getline(line, kLineLen)) {
     ++nline;
     std::vector<char *> col;
-    SplitToVector(line, "\n\t ", &col, true);
+    SplitString(line, "\n\t ", &col, true);
     // empty line or comment?
     if (col.empty() || col[0][0] == '\0' || col[0][0] == '#') continue;
     if (col.size() != 2) {
@@ -425,4 +425,4 @@ class CompactSet {
 
 }  // namespace fst
 
-#endif  // FST_LIB_UTIL_H_
+#endif  // FST_UTIL_H_

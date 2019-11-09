@@ -1,6 +1,12 @@
+# Ignore extensionless files
+*
+!*.*
+!*/
 
 *~
 \#*\#
+*.orig
+*in~*
 
 Makefile.in
 aclocal.m4
@@ -14,4 +20,14 @@ configure
 ltmain.sh
 m4/
 
+# Other patterns
+/config.h
+/config.log
+/config.status
+.deps/
+.libs/
+.dirstamp
+*.la
+*.lo
+*.o
 

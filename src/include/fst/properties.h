@@ -3,8 +3,8 @@
 //
 // FST property bits.
 
-#ifndef FST_LIB_PROPERTIES_H_
-#define FST_LIB_PROPERTIES_H_
+#ifndef FST_PROPERTIES_H_
+#define FST_PROPERTIES_H_
 
 #include <sys/types.h>
 #include <vector>
@@ -307,7 +307,8 @@ constexpr uint64 kFstProperties = kBinaryProperties | kTrinaryProperties;
 inline uint64 SetStartProperties(uint64 inprops);
 
 template <typename Weight>
-uint64 SetFinalProperties(uint64 inprops, Weight old_weight, Weight new_weight);
+uint64 SetFinalProperties(uint64 inprops, const Weight &old_weight,
+                          const Weight &new_weight);
 
 inline uint64 AddStateProperties(uint64 inprops);
 
@@ -391,8 +392,8 @@ uint64 DeleteArcsProperties(uint64 inprops) {
 // Definitions of template functions.
 
 template <typename Weight>
-uint64 SetFinalProperties(uint64 inprops, Weight old_weight,
-                          Weight new_weight) {
+uint64 SetFinalProperties(uint64 inprops, const Weight &old_weight,
+                          const Weight &new_weight) {
   auto outprops = inprops;
   if (old_weight != Weight::Zero() && old_weight != Weight::One()) {
     outprops &= ~kWeighted;
@@ -464,4 +465,4 @@ extern const char *PropertyNames[];
 
 }  // namespace fst
 
-#endif  // FST_LIB_PROPERTIES_H_
+#endif  // FST_PROPERTIES_H_

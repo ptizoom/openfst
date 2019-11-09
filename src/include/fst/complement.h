@@ -3,8 +3,8 @@
 //
 // Class to complement an FST.
 
-#ifndef FST_LIB_COMPLEMENT_H_
-#define FST_LIB_COMPLEMENT_H_
+#ifndef FST_COMPLEMENT_H_
+#define FST_COMPLEMENT_H_
 
 #include <algorithm>
 #include <string>
@@ -246,7 +246,7 @@ class ArcIterator<ComplementFst<Arc>> : public ArcIteratorBase<Arc> {
     pos_ = a;
   }
 
-  constexpr uint32 Flags() const final { return kArcValueFlags; }
+  uint32 Flags() const final { return kArcValueFlags; }
 
   void SetFlags(uint32, uint32) final {}
 
@@ -274,4 +274,4 @@ using StdComplementFst = ComplementFst<StdArc>;
 
 }  // namespace fst
 
-#endif  // FST_LIB_COMPLEMENT_H_
+#endif  // FST_COMPLEMENT_H_

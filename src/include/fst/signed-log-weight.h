@@ -8,8 +8,8 @@
 //  positive, TropicalWeight.Value() > 0.0, recommended value 1.0
 //  negative, TropicalWeight.Value() <= 0.0, recommended value -1.0
 
-#ifndef FST_LIB_SIGNED_LOG_WEIGHT_H_
-#define FST_LIB_SIGNED_LOG_WEIGHT_H_
+#ifndef FST_SIGNED_LOG_WEIGHT_H_
+#define FST_SIGNED_LOG_WEIGHT_H_
 
 #include <cstdlib>
 
@@ -54,8 +54,9 @@ class SignedLogWeightTpl : public PairWeight<TropicalWeight, LogWeightTpl<T>> {
   }
 
   static const string &Type() {
-    static const string type = "signed_log_" + X1::Type() + "_" + X2::Type();
-    return type;
+    static const string *const type =
+        new string("signed_log_" + X1::Type() + "_" + X2::Type());
+    return *type;
   }
 
   SignedLogWeightTpl Quantize(float delta = kDelta) const {
@@ -111,18 +112,18 @@ inline SignedLogWeightTpl<T> Plus(const SignedLogWeightTpl<T> &w1,
   } else if (f1 > f2) {
     if (equal) {
       return SignedLogWeightTpl<T>(X1(w1.Value1()),
-                                   X2(f2 - log(1.0F + exp(f2 - f1))));
+                                   X2(f2 - internal::LogPosExp(f1 - f2)));
     } else {
       return SignedLogWeightTpl<T>(X1(w2.Value1()),
-                                   X2((f2 - log(1.0F - exp(f2 - f1)))));
+                                   X2((f2 - internal::LogNegExp(f1 - f2))));
     }
   } else {
     if (equal) {
       return SignedLogWeightTpl<T>(X1(w2.Value1()),
-                                   X2((f1 - log(1.0F + exp(f1 - f2)))));
+                                   X2((f1 - internal::LogPosExp(f2 - f1))));
     } else {
       return SignedLogWeightTpl<T>(X1(w1.Value1()),
-                                   X2((f1 - log(1.0F - exp(f1 - f2)))));
+                                   X2((f1 - internal::LogNegExp(f2 - f1))));
     }
   }
 }
@@ -208,8 +209,8 @@ using SignedLog64Weight = SignedLogWeightTpl<double>;
 template <class W1, class W2>
 bool SignedLogConvertCheck(W1 weight) {
   if (weight.Value1().Value() < 0.0) {
-    FSTERROR() << "WeightConvert: Can't convert weight from " << W1::Type()
-               << " to " << W2::Type();
+    FSTERROR() << "WeightConvert: Can't convert weight " << weight
+               << " from " << W1::Type() << " to " << W2::Type();
     return false;
   }
   return true;
@@ -432,4 +433,4 @@ class WeightGenerate<SignedLogWeightTpl<T>> {
 
 }  // namespace fst
 
-#endif  // FST_LIB_SIGNED_LOG_WEIGHT_H_
+#endif  // FST_SIGNED_LOG_WEIGHT_H_

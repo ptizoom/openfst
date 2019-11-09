@@ -9,11 +9,11 @@ from libcpp cimport bool
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 
+from libcpp.string cimport string
 from basictypes cimport int32
 from basictypes cimport int64
 from basictypes cimport uint32
 from basictypes cimport uint64
-from libcpp.string cimport string
 from ios cimport istream
 from ios cimport ostream
 
@@ -27,6 +27,7 @@ cdef extern from "<fst/util.h>" nogil:
 
 cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
 
+  # FST properties.
   const uint64 kExpanded
   const uint64 kMutable
   const uint64 kError
@@ -86,21 +87,26 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
   const uint64 kNegTrinaryProperties
   const uint64 kFstProperties
 
-  # Default argument constants.
-  const float kDelta
-  const int64 kNoStateId
+  # ArcIterator flags.
+  const uint32 kArcILabelValue
+  const uint32 kArcOLabelValue
+  const uint32 kArcWeightValue
+  const uint32 kArcNextStateValue
+  const uint32 kArcNoCache
+  const uint32 kArcValueFlags
+  const uint32 kArcFlags
 
   # EncodeMapper flags.
   const uint32 kEncodeLabels
   const uint32 kEncodeWeights
   const uint32 kEncodeFlags
 
-  # Push flags.
-  const uint32 kPushLabels
-  const uint32 kPushRemoveCommonAffix
-  const uint32 kPushRemoveTotalWeight
-  const uint32 kPushWeights
-
+  # Default argument constants.
+  const float kDelta
+  const float kShortestDelta
+  const int kNoLabel
+  const int kNoStateId
+  const int64 kNoSymbol
 
   enum ClosureType:
     CLOSURE_STAR
@@ -114,6 +120,11 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
     ALT_SEQUENCE_FILTER
     MATCH_FILTER
     TRIVIAL_FILTER
+
+
+  cdef cppclass ComposeOptions:
+
+    ComposeOptions(bool, ComposeFilter)
 
 
   enum DeterminizeType:
@@ -172,7 +183,6 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
 
     SymbolTableTextOptions(bool)
 
-
   # Symbol tables.
   cdef cppclass SymbolTable:
 
@@ -192,16 +202,16 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
 
     SymbolTable *Copy()
 
-    # Aliased so the Cython transpiler can sort out the overloading.
-
+    # Aliased for overload.
     string FindSymbol "Find"(int64)
 
+    # Aliased for overload.
     int64 FindIndex "Find"(string)
 
-    # Aliased so the Cython transpiler can sort out the overloading.
-
+    # Aliased for overload.
     bool MemberSymbol "Member"(string)
 
+    # Aliased for overload.
     bool MemberIndex "Member"(int64)
 
     void AddTable(const SymbolTable &)
@@ -212,9 +222,9 @@ cdef extern from "<fst/fstlib.h>" namespace "fst" nogil:
 
     void SetName(const string &)
 
-    string CheckSum()
+    const string &CheckSum()
 
-    string LabeledCheckSum()
+    const string &LabeledCheckSum()
 
     bool Write(const string &)
 
@@ -273,6 +283,12 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     @staticmethod
     const WeightClass &NoWeight(const string &)
 
+  # Alias.
+  cdef bool Eq "operator=="(const WeightClass &, const WeightClass &)
+
+  # Alias.
+  cdef bool Ne "operator!="(const WeightClass &, const WeightClass &)
+
   cdef WeightClass Plus(const WeightClass &, const WeightClass &)
 
   cdef WeightClass Times(const WeightClass &, const WeightClass &)
@@ -304,8 +320,9 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     @staticmethod
     FstClass *Read(const string &)
 
+    # Aliased for overload.
     @staticmethod
-    FstClass *ReadFromString(const string &)
+    FstClass *ReadFromStream "Read"(istream &, const string &)
 
     int64 Start()
 
@@ -329,7 +346,7 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
     bool Write(const string &)
 
-    const string WriteToString()
+    bool Write(ostream &, const string &)
 
     uint64 Properties(uint64, bool)
 
@@ -382,8 +399,7 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
     EncodeMapperClass(const string &, uint32, EncodeType)
 
-    # Aliases this to "__call__", since Cython doesn't have good support for
-    # this C++ operator.
+    # Aliased to __call__ as Cython doesn't have good support for operator().
     ArcClass __call__ "operator()"(const ArcClass &)
 
     const string &ArcType()
@@ -491,9 +507,6 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
                                     const SymbolTable *, const SymbolTable *,
                                     const SymbolTable*, bool, bool, bool, bool,
                                     bool)
-  cdef cppclass ComposeOptions:
-
-    ComposeOptions(bool, ComposeFilter)
 
   cdef void Compose(FstClass &, FstClass &, MutableFstClass *,
                     const ComposeOptions &)
@@ -537,7 +550,7 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
   cdef bool Equal(const FstClass &, const FstClass &, float)
 
-  cdef bool Equivalent(const FstClass &, const FstClass &, float, bool *)
+  cdef bool Equivalent(const FstClass &, const FstClass &, float)
 
   cdef void Intersect(const FstClass &, const FstClass &, MutableFstClass *,
                       const ComposeOptions &)
@@ -561,7 +574,8 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     TO_LOG64_MAPPER
     TO_STD_MAPPER
 
-  cdef FstClass *Map(const FstClass &, MapType, float, const WeightClass &)
+  cdef FstClass *Map(const FstClass &, MapType, float, double,
+                     const WeightClass &)
 
   cdef void Minimize(MutableFstClass *, MutableFstClass *, float, bool)
 
@@ -589,15 +603,15 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
     FAST_LOG_PROB_ARC_SELECTOR
 
   cdef bool RandEquivalent(const FstClass &, const FstClass &, int32, float,
-                           time_t, const RandGenOptions[RandArcSelection] &,
-                           bool *)
+                           time_t, const RandGenOptions[RandArcSelection] &)
 
   cdef void RandGen(const FstClass &, MutableFstClass *, time_t,
                     const RandGenOptions[RandArcSelection] &)
 
-  cdef void Relabel(MutableFstClass *,
-      const SymbolTable *, const SymbolTable *, const string &, bool,
-      const SymbolTable *, const SymbolTable *, const string &, bool)
+  cdef void Relabel(MutableFstClass *, const SymbolTable *,
+                    const SymbolTable *, const string &, bool,
+                    const SymbolTable *, const SymbolTable *, const string &,
+                    bool)
 
   cdef void Relabel(MutableFstClass *, const vector[LabelPair] &,
                     const vector[LabelPair] &)
@@ -616,13 +630,9 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
   cdef cppclass RmEpsilonOptions:
 
-    RmEpsilonOptions(QueueType, float, bool, const WeightClass &, int64)
+    RmEpsilonOptions(QueueType, bool, const WeightClass &, int64, float)
 
-  cdef void RmEpsilon(const FstClass &, MutableFstClass *, bool,
-                      const RmEpsilonOptions &)
-
-  cdef void RmEpsilon(MutableFstClass *, bool, const WeightClass &, int64,
-                      float)
+  cdef void RmEpsilon(MutableFstClass *, const RmEpsilonOptions &)
 
   cdef cppclass ShortestDistanceOptions:
 
@@ -636,11 +646,11 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
 
   cdef cppclass ShortestPathOptions:
 
-    ShortestPathOptions(QueueType, int32, bool, bool, float, bool,
-                        const WeightClass &, int64)
+    ShortestPathOptions(QueueType, int32, bool, float, const WeightClass &,
+                        int64)
 
   cdef void ShortestPath(const FstClass &, MutableFstClass *,
-                         vector[WeightClass] *, const ShortestPathOptions &)
+                         const ShortestPathOptions &)
 
   cdef void Synchronize(const FstClass &, MutableFstClass *)
 
@@ -651,7 +661,7 @@ cdef extern from "<fst/script/fstscript.h>" namespace "fst::script" nogil:
   cdef bool Verify(const FstClass &)
 
 
-cdef extern from "nlp/fst/script/getters.h" namespace "fst::script" nogil:
+cdef extern from "<fst/script/getters.h>" namespace "fst::script" nogil:
 
   cdef bool GetArcSortType(const string &, ArcSortType *)
 

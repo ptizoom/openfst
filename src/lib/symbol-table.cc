@@ -5,6 +5,7 @@
 
 #include <fst/symbol-table.h>
 
+#include <fst/flags.h>
 #include <fst/log.h>
 
 #include <fstream>
@@ -39,7 +40,7 @@ SymbolTableImpl *SymbolTableImpl::ReadText(std::istream &strm,
     ++nline;
     std::vector<char *> col;
     auto separator = opts.fst_field_separator + "\n";
-    SplitToVector(line, separator.c_str(), &col, true);
+    SplitString(line, separator.c_str(), &col, true);
     if (col.empty()) continue;  // Empty line.
     if (col.size() != 2) {
       LOG(ERROR) << "SymbolTable::ReadText: Bad number of columns ("
@@ -52,8 +53,8 @@ SymbolTableImpl *SymbolTableImpl::ReadText(std::istream &strm,
     const char *value = col[1];
     char *p;
     const auto key = strtoll(value, &p, 10);
-    if (p < value + strlen(value) ||
-       (!opts.allow_negative_labels && key < 0) || key == -1) {
+    if (p < value + strlen(value) || (!opts.allow_negative_labels && key < 0) ||
+        key == kNoSymbol) {
       LOG(ERROR) << "SymbolTable::ReadText: Bad non-negative integer \""
                  << value << "\", "
                  << "file = " << filename << ", line = " << nline;
@@ -220,7 +221,7 @@ bool SymbolTableImpl::Write(std::ostream &strm) const {
 
 }  // namespace internal
 
-constexpr size_t SymbolTable::kNoSymbol;
+//PTZ191107 constexpr size_t SymbolTable::kNoSymbol;
 
 void SymbolTable::AddTable(const SymbolTable &table) {
   MutateCheck();
@@ -270,7 +271,9 @@ DenseSymbolMap::DenseSymbolMap(const DenseSymbolMap &x)
 }
 
 DenseSymbolMap::~DenseSymbolMap() {
-  for (size_t i = 0; i < symbols_.size(); ++i) delete[] symbols_[i];
+  for (size_t i = 0; i < symbols_.size(); ++i) {
+    delete[] symbols_[i];
+  }
 }
 
 std::pair<size_t, bool> DenseSymbolMap::InsertOrFind(const string &key) {
@@ -282,14 +285,14 @@ std::pair<size_t, bool> DenseSymbolMap::InsertOrFind(const string &key) {
   while (buckets_[idx] != empty_) {
     const auto stored_value = buckets_[idx];
     if (!strcmp(symbols_[stored_value], key.c_str())) {
-      return std::make_pair(stored_value, false);
+      return {stored_value, false};
     }
     idx = (idx + 1) & hash_mask_;
   }
   auto next = symbols_.size();
   buckets_[idx] = next;
   symbols_.push_back(NewSymbol(key));
-  return std::make_pair(next, true);
+  return {next, true};
 }
 
 size_t DenseSymbolMap::Find(const string &key) const {

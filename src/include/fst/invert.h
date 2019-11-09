@@ -3,8 +3,8 @@
 //
 // Functions and classes to invert an FST.
 
-#ifndef FST_LIB_INVERT_H_
-#define FST_LIB_INVERT_H_
+#ifndef FST_INVERT_H_
+#define FST_INVERT_H_
 
 #include <fst/arc-map.h>
 #include <fst/mutable-fst.h>
@@ -20,21 +20,29 @@ struct InvertMapper {
 
   InvertMapper() {}
 
-  ToArc operator()(const FromArc &arc) {
+  ToArc operator()(const FromArc &arc) const {
     return ToArc(arc.olabel, arc.ilabel, arc.weight, arc.nextstate);
   }
 
-  MapFinalAction FinalAction() const { return MAP_NO_SUPERFINAL; }
+  constexpr MapFinalAction FinalAction() const {
+     return MAP_NO_SUPERFINAL;
+  }
 
-  MapSymbolsAction InputSymbolsAction() const { return MAP_CLEAR_SYMBOLS; }
+  constexpr MapSymbolsAction InputSymbolsAction() const {
+    return MAP_CLEAR_SYMBOLS;
+  }
 
-  MapSymbolsAction OutputSymbolsAction() const { return MAP_CLEAR_SYMBOLS; }
+  constexpr MapSymbolsAction OutputSymbolsAction() const {
+    return MAP_CLEAR_SYMBOLS;
+  }
 
-  uint64 Properties(uint64 props) { return InvertProperties(props); }
+  uint64 Properties(uint64 props) const {
+    return InvertProperties(props);
+  }
 };
 
 // Inverts the transduction corresponding to an FST by exchanging the
-// FST's input and output labels. This version modifies its input.
+// FST's input and output labels.
 //
 // Complexity:
 //
@@ -42,6 +50,18 @@ struct InvertMapper {
 //   Space: O(1)
 //
 // where V is the number of states and E is the number of arcs.
+template <class Arc>
+inline void Invert(const Fst<Arc> &ifst, MutableFst<Arc> *ofst) {
+  std::unique_ptr<SymbolTable> input(
+      ifst.InputSymbols() ? ifst.InputSymbols()->Copy() : nullptr);
+  std::unique_ptr<SymbolTable> output(
+      ifst.OutputSymbols() ? ifst.OutputSymbols()->Copy() : nullptr);
+  ArcMap(ifst, ofst, InvertMapper<Arc>());
+  ofst->SetInputSymbols(output.get());
+  ofst->SetOutputSymbols(input.get());
+}
+
+// Destructive variant of the above.
 template <class Arc>
 inline void Invert(MutableFst<Arc> *fst) {
   std::unique_ptr<SymbolTable> input(
@@ -116,4 +136,4 @@ using StdInvertFst = InvertFst<StdArc>;
 
 }  // namespace fst
 
-#endif  // FST_LIB_INVERT_H_
+#endif  // FST_INVERT_H_

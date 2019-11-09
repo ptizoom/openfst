@@ -5,8 +5,8 @@
 // using a key. The key can be used to do an in-place update of values in the
 // heap.
 
-#ifndef FST_LIB_HEAP_H_
-#define FST_LIB_HEAP_H_
+#ifndef FST_HEAP_H_
+#define FST_HEAP_H_
 
 #include <utility>
 #include <vector>
@@ -70,7 +70,7 @@ class Heap {
     }
   }
 
-  // Returns the greatest (max=true) / least (max=false) value.
+  // Returns the least value.
   Value Pop() {
     Value top = values_.front();
     Swap(0, size_-1);
@@ -79,8 +79,8 @@ class Heap {
     return top;
   }
 
-  // Returns the greatest (max=true) / least (max=false) value w.r.t.
-  // the comparison function from the heap.
+  // Returns the least value w.r.t.  the comparison function from the
+  // heap.
   const Value &Top() const { return values_.front(); }
 
   // Returns the element for the given key.
@@ -102,6 +102,8 @@ class Heap {
     pos_.reserve(size);
     key_.reserve(size);
   }
+
+  const Compare &GetCompare() const { return comp_; }
 
  private:
   // The following private routines are used in a supportive role
@@ -175,4 +177,4 @@ constexpr std::size_t Heap<T, Compare>::kNoKey;
 
 }  // namespace fst
 
-#endif  // FST_LIB_HEAP_H_
+#endif  // FST_HEAP_H_
