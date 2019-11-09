@@ -94,8 +94,7 @@ template <class A, class C>
 void ArcMap(MutableFst<A> *fst, C *mapper) {
   using FromArc = A;
   using ToArc = A;
-  //PTZ191108 not using StateId = typename FromArc::StateId;
-  //PTZ191108 not
+  using StateId = typename FromArc::StateId;
   using Weight = typename FromArc::Weight;
   if (mapper->InputSymbolsAction() == MAP_CLEAR_SYMBOLS) {
     fst->SetInputSymbols(nullptr);
@@ -103,7 +102,7 @@ void ArcMap(MutableFst<A> *fst, C *mapper) {
   if (mapper->OutputSymbolsAction() == MAP_CLEAR_SYMBOLS) {
     fst->SetOutputSymbols(nullptr);
   }
-  if (fst->Start() == kNoStateId) return;
+  if (fst->Start() == static_cast<StateId>(kNoStateId)) return;
   const auto props = fst->Properties(kFstProperties, false);
   const auto final_action = mapper->FinalAction();
   auto superfinal = kNoStateId;
@@ -132,7 +131,7 @@ void ArcMap(MutableFst<A> *fst, C *mapper) {
         break;
       }
       case MAP_ALLOW_SUPERFINAL: {
-        if (state != superfinal) {
+          if (state != static_cast<StateId>(superfinal)) {
           const FromArc arc(0, 0, fst->Final(state), kNoStateId);
           auto final_arc = (*mapper)(arc);
           if (final_arc.ilabel != 0 || final_arc.olabel != 0) {
@@ -151,7 +150,7 @@ void ArcMap(MutableFst<A> *fst, C *mapper) {
         break;
       }
       case MAP_REQUIRE_SUPERFINAL: {
-        if (state != superfinal) {
+        if (state != (StateId)superfinal) {
           const FromArc arc(0, 0, fst->Final(state), kNoStateId);
           const auto final_arc = (*mapper)(arc);
           if (final_arc.ilabel != 0 || final_arc.olabel != 0 ||
@@ -182,7 +181,7 @@ template <class A, class B, class C>
 void ArcMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
   using FromArc = A;
   using StateId = typename FromArc::StateId;
-  //PTZ191108 not using Weight = typename FromArc::Weight;
+  //PTZ180426 not used? using Weight = ATTRIBUTE_UNUSED typename FromArc::Weight;
   ofst->DeleteStates();
   if (mapper->InputSymbolsAction() == MAP_COPY_SYMBOLS) {
     ofst->SetInputSymbols(ifst.InputSymbols());

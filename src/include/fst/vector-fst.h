@@ -183,7 +183,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
     for (StateId i = 0; i < dstates.size(); ++i) newid[dstates[i]] = kNoStateId;
     StateId nstates = 0;
     for (StateId state = 0; state < states_.size(); ++state) {
-      if (newid[state] != kNoStateId) {
+        if (newid[state] != static_cast<StateId>(kNoStateId)) {
         newid[state] = nstates;
         if (state != nstates) states_[nstates] = states_[state];
         ++nstates;
@@ -199,7 +199,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
       auto noeps = states_[state]->NumOutputEpsilons();
       for (size_t i = 0; i < states_[state]->NumArcs(); ++i) {
         const auto t = newid[arcs[i].nextstate];
-        if (t != kNoStateId) {
+        if (t != static_cast<StateId>(kNoStateId)) {
           arcs[i].nextstate = t;
           if (i != narcs) arcs[narcs] = arcs[i];
           ++narcs;
@@ -212,7 +212,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
       states_[state]->SetNumInputEpsilons(nieps);
       states_[state]->SetNumOutputEpsilons(noeps);
     }
-    if (Start() != kNoStateId) SetStart(newid[Start()]);
+    if (Start() != static_cast<StateId>(kNoStateId)) SetStart(newid[Start()]);
   }
 
   void DeleteStates() {
@@ -257,6 +257,7 @@ class VectorFstBaseImpl : public FstImpl<typename S::Arc> {
   typename State::StateAllocator state_alloc_;  // For state allocation.
   typename State::ArcAllocator arc_alloc_;      // For arc allocation.
 
+ private:
   VectorFstBaseImpl(const VectorFstBaseImpl &) = delete;
   VectorFstBaseImpl &operator=(const VectorFstBaseImpl &) = delete;
 };
@@ -389,7 +390,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
   impl->BaseImpl::SetStart(hdr.Start());
   if (hdr.NumStates() != kNoStateId) impl->ReserveStates(hdr.NumStates());
   StateId state = 0;
-  for (; hdr.NumStates() == kNoStateId || state < hdr.NumStates(); ++state) {
+  for (; hdr.NumStates() == kNoStateId || state < (StateId) hdr.NumStates(); ++state) {
     Weight weight;
     if (!weight.Read(strm)) break;
     impl->BaseImpl::AddState();
@@ -402,7 +403,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       return nullptr;
     }
     impl->ReserveArcs(state, narcs);
-    for (int64 i = 0; i < narcs; ++i) {
+    for (size_t i = 0; i < (size_t) narcs; ++i) {
       Arc arc;
       ReadType(strm, &arc.ilabel);
       ReadType(strm, &arc.olabel);
@@ -415,7 +416,7 @@ VectorFstImpl<S> *VectorFstImpl<S>::Read(std::istream &strm,
       impl->BaseImpl::AddArc(state, arc);
     }
   }
-  if (hdr.NumStates() != kNoStateId && state != hdr.NumStates()) {
+  if (hdr.NumStates() != kNoStateId && state != (StateId)hdr.NumStates()) {
     LOG(ERROR) << "VectorFst::Read: Unexpected end of file: " << opts.source;
     return nullptr;
   }
@@ -531,7 +532,7 @@ bool VectorFst<Arc, State>::WriteFst(const FST &fst, std::ostream &strm,
   hdr.SetNumStates(kNoStateId);
   size_t start_offset = 0;
   if (fst.Properties(kExpanded, false) || opts.stream_write ||
-      (start_offset = strm.tellp()) != -1) {
+      (start_offset = strm.tellp()) != static_cast<StateId>(kNoStateId)) {
     hdr.SetNumStates(CountStates(fst));
     update_header = false;
   }
@@ -565,7 +566,7 @@ bool VectorFst<Arc, State>::WriteFst(const FST &fst, std::ostream &strm,
         fst, strm, opts, file_version, "vector", properties, &hdr,
         start_offset);
   } else {
-    if (num_states != hdr.NumStates()) {
+      if (num_states != static_cast< StateId >(hdr.NumStates())) {
       LOG(ERROR) << "Inconsistent number of states observed during write";
       return false;
     }

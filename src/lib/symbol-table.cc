@@ -221,8 +221,6 @@ bool SymbolTableImpl::Write(std::ostream &strm) const {
 
 }  // namespace internal
 
-//PTZ191107 constexpr size_t SymbolTable::kNoSymbol;
-
 void SymbolTable::AddTable(const SymbolTable &table) {
   MutateCheck();
   for (SymbolTableIterator iter(table); !iter.Done(); iter.Next()) {

@@ -721,8 +721,8 @@ class RandGenVisitor {
 template <class FromArc, class ToArc, class Selector>
 void RandGen(const Fst<FromArc> &ifst, MutableFst<ToArc> *ofst,
              const RandGenOptions<Selector> &opts) {
-  //PTZ191108 not using State = typename ToArc::StateId;
-  //PTZ191108 not using Weight = typename ToArc::Weight;
+  using State ATTRIBUTE_UNUSED = typename ToArc::StateId;
+  using Weight ATTRIBUTE_UNUSED = typename ToArc::Weight;
   using Sampler = ArcSampler<FromArc, Selector>;
   auto *sampler = new Sampler(ifst, opts.selector, opts.max_length);
   RandGenFstOptions<Sampler> fopts(CacheOptions(true, 0), sampler, opts.npath,

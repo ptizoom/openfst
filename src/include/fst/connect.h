@@ -146,7 +146,7 @@ class SccVisitor {
   void FinishVisit() {
     // Numbers SCCs in topological order when acyclic.
     if (scc_) {
-      for (StateId s = 0; s < scc_->size(); ++s) {
+      for (StateId s = 0; (size_t)s < scc_->size(); ++s) {
         (*scc_)[s] = nscc_ - 1 - (*scc_)[s];
       }
     }
@@ -201,7 +201,7 @@ inline void SccVisitor<Arc>::InitVisit(const Fst<Arc> &fst) {
 template <class Arc>
 inline bool SccVisitor<Arc>::InitState(StateId s, StateId root) {
   scc_stack_->push_back(s);
-  while (dfnumber_->size() <= s) {
+  while (dfnumber_->size() <= (size_t)s) {
     if (scc_) scc_->push_back(-1);
     if (access_) access_->push_back(false);
     coaccess_->push_back(false);
@@ -247,7 +247,7 @@ inline void SccVisitor<Arc>::FinishState(StateId s, StateId p, const Arc *) {
     }
     ++nscc_;
   }
-  if (p != kNoStateId) {
+  if (p != static_cast<StateId>(kNoStateId)) {
     if ((*coaccess_)[s]) (*coaccess_)[p] = true;
     if ((*lowlink_)[s] < (*lowlink_)[p]) (*lowlink_)[p] = (*lowlink_)[s];
   }

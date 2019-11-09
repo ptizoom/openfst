@@ -1073,6 +1073,12 @@ class ArcIterator<ReplaceFst<Arc, StateTable, CacheStore>> {
       fst_.GetMutableImpl()->Expand(s_);
     }
     // If state is already cached, use cached arcs array.
+    //PTZ170814 scoffs gcc5.7 on this structure...
+    //->template CacheBaseImpl< typename C::State, C >::InitArcIterator(state_, &cache_data_);
+    // include/fst/replace.h: Dans le constructeur « fst::ArcIterator<fst::ReplaceFst<A, T, C> >::ArcIterator(const fst::ReplaceFst<A, T, C>&, fst::ArcIterator<fst::ReplaceFst<A, T, C> >::StateId) »:
+    // include/fst/replace.h:1198:59: error: expected « ; » before « :: » token
+    //       ->template CacheBaseImpl< typename C::State, C >::InitArcIterator(
+    //                                                       ^~
     if (fst_.GetImpl()->HasArcs(s_)) {
       (fst_.GetImpl())
           ->internal::template CacheBaseImpl<

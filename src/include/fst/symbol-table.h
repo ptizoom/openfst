@@ -402,7 +402,7 @@ class SymbolTableIterator {
   ~SymbolTableIterator() {}
 
   // Returns whether iterator is done.
-  bool Done() const { return (pos_ == nsymbols_); }
+  bool Done() const { return ((size_t)pos_ == nsymbols_); }
 
   // Return the key of the current symbol.
   size_t Value() const { return key_; }
@@ -413,7 +413,7 @@ class SymbolTableIterator {
   // Advances iterator.
   void Next() {
     ++pos_;
-    if (pos_ < nsymbols_) key_ = table_.GetNthKey(pos_);
+    if (pos_ >= 0 && (size_t) pos_ < nsymbols_) key_ = table_.GetNthKey(pos_);
   }
 
   // Resets iterator.

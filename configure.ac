@@ -10,8 +10,8 @@ AM_PROG_AR
 # OpenFst does not throw exceptions, so we do not generate exception handling
 # code. However, users are free to re-enable exception handling.
 # OpenFst assumes char is unsigned; -fsigned-char is likely unsafe.
-#CPPFLAGS="$CPPFLAGS -fno-exceptions -funsigned-char"
-#CXXFLAGS="$CXXFLAGS -std=c++11"
+CPPFLAGS="$CPPFLAGS -fno-exceptions -funsigned-char"
+CXXFLAGS="$CXXFLAGS -std=c++11"
 
 AC_PROG_CXX
 AC_DISABLE_STATIC
@@ -43,85 +43,59 @@ AC_CONFIG_FILES([
 AC_CONFIG_MACRO_DIR([m4])
 AC_LANG([C++])
 
-dnl PTZ180625 need to do LT_INIT instead???
-#CXXFLAGS="$CXXFLAGS -std=c++11"
-#AS_VAR_APPEND([CXXFLAGS], [-std=c++11])
-LT_INIT
-
-AC_ARG_ENABLE(
-	[bin],
-	[AS_HELP_STRING(
-		[--enable-bin],
-		[enable fst::script and command-line binaries])],
-	[],
-	[enable_bin=yes])
-AM_CONDITIONAL([HAVE_BIN], [test "x$enable_bin" != xno])
-AM_CONDITIONAL([HAVE_SCRIPT], [test "x$enable_bin" != xno])
-
-AC_ARG_ENABLE(
-	[compact-fsts],
-	[AS_HELP_STRING(
-		[--enable-compact-fsts],
-		[enable all CompactFst extensions])],
-	[],
-	[enable_compact_fsts=no])
+AC_ARG_ENABLE([compact-fsts],
+              [AS_HELP_STRING([--enable-compact-fsts],
+              [enable CompactFst extensions])],
+              [],
+              [enable_compact_fsts=no])
 AM_CONDITIONAL([HAVE_COMPACT], [test "x$enable_compact_fsts" != xno])
 
-AC_ARG_ENABLE(
-	[compress],
-	[AS_HELP_STRING(
-		[--enable-compress],
-		[enable compression extension])],
-	[],
-	[enable_compress=no])
+AC_ARG_ENABLE([compress],
+              [AS_HELP_STRING([--enable-compress],
+              [enable compression extension])],
+              [],
+              [enable_compress=no])
 AM_CONDITIONAL([HAVE_COMPRESS], [test "x$enable_compress" != xno])
 
-AC_ARG_ENABLE(
-	[const-fsts],
-	[AS_HELP_STRING(
-		[--enable-const-fsts],
-		[enable all ConstFst extensions])],
-	[],
-	[enable_const_fsts=no])
+AC_ARG_ENABLE([const-fsts],
+              [AS_HELP_STRING([--enable-const-fsts],
+              [enable ConstFst extensions])],
+              [],
+              [enable_const_fsts=no])
 AM_CONDITIONAL([HAVE_CONST], [test "x$enable_const_fsts" != xno])
 
-AC_ARG_ENABLE([far], [AS_HELP_STRING([--enable-far], [enable FAR extensions])],
-              [], [enable_far=no])
+AC_ARG_ENABLE([far],
+              [AS_HELP_STRING([--enable-far], [enable FAR extensions])],
+              [],
+              [enable_far=no])
 AM_CONDITIONAL([HAVE_FAR], [test "x$enable_far" != xno])
 
-AC_ARG_ENABLE(
-	[linear-fsts],
-	[AS_HELP_STRING(
-		[--enable-linear-fsts],
-		[enable all LinearTagger/ClassifierFst extensions])],
-	[],
-	[enable_linear_fsts=no])
+AC_ARG_ENABLE([linear-fsts],
+              [AS_HELP_STRING([--enable-linear-fsts],
+              [enable LinearTagger/ClassifierFst extensions])],
+              [],
+              [enable_linear_fsts=no])
 AM_CONDITIONAL([HAVE_LINEAR], [test "x$enable_linear_fsts" != xno])
 
-AC_ARG_ENABLE(
-	[lookahead-fsts],
-	[AS_HELP_STRING(
-		[--enable-lookahead-fsts],
-		[enable LookAheadFst extensions])],
-	[],
-	[enable_lookahead_fsts=no])
+AC_ARG_ENABLE([lookahead-fsts],
+              [AS_HELP_STRING([--enable-lookahead-fsts],
+              [enable LookAheadFst extensions])],
+              [],
+              [enable_lookahead_fsts=no])
 AM_CONDITIONAL([HAVE_LOOKAHEAD], [test "x$enable_lookahead_fsts" != xno])
 
 AC_ARG_ENABLE([mpdt],
-              [AS_HELP_STRING(
-                [--enable-mpdt],
-                [enable MPDT extensions])],
+              [AS_HELP_STRING([--enable-mpdt],
+              [enable MPDT extensions])],
               [],
               [enable_mpdt=no])
 AM_CONDITIONAL([HAVE_MPDT], [test "x$enable_mpdt" != xno])
 
-AC_ARG_ENABLE(
-	[ngram-fsts],
-	[AS_HELP_STRING(
-		[--enable-ngram-fsts],
-		[enable NGramFst extension])],
-	[],
-	[enable_ngram_fsts=no])
+AC_ARG_ENABLE([ngram-fsts],
+              [AS_HELP_STRING([--enable-ngram-fsts],
+              [enable NGramFst extension])],
+              [],
+              [enable_ngram_fsts=no])
 AM_CONDITIONAL([HAVE_NGRAM], [test "x$enable_ngram_fsts" != xno])
 
 AC_ARG_ENABLE([pdt],

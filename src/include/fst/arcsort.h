@@ -64,7 +64,8 @@ class ArcSortMapper {
   const Fst<Arc> &fst_;
   const Compare &comp_;
   std::vector<Arc> arcs_;
-  ssize_t i_;  // current arc position
+  //PTZ180828 ssize_t to size_t
+  size_t i_;  // current arc position
 
   ArcSortMapper &operator=(const ArcSortMapper &) = delete;
 };

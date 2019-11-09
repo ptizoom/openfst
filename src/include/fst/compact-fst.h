@@ -284,7 +284,7 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
     for (ArcIterator<Fst<Arc>> aiter(fst, s); !aiter.Done(); aiter.Next()) {
       compacts_[pos++] = compactor.Compact(s, aiter.Value());
     }
-    if ((compactor.Size() != -1) && ((pos - fpos) != compactor.Size())) {
+    if ((compactor.Size() != -1) && ((pos - fpos) != (size_t)compactor.Size())) {
       FSTERROR() << "DefaultCompactStore: Compactor incompatible with FST";
       error_ = true;
       return;
@@ -667,6 +667,8 @@ class DefaultCompactState<C, U, DefaultCompactStore<typename C::Element, U>> {
   using Weight = typename Arc::Weight;
   using CompactStore = DefaultCompactStore<typename C::Element, U>;
 
+  using Label = typename Arc::Label;
+ 
   DefaultCompactState() = default;
 
   DefaultCompactState(
@@ -708,8 +710,9 @@ class DefaultCompactState<C, U, DefaultCompactStore<typename C::Element, U>> {
     }
     if (num_arcs_ > 0) {
       compacts_ = &(store->Compacts(offset));
+      //TODO::PTZ180827 should it be   kNoLabel anyhow?
       if (arc_compactor_->Expand(s_, *compacts_, kArcILabelValue).ilabel
-          == kNoStateId) {
+          == static_cast< Label >(kNoLabel) /*kNoStateId*/) {
         ++compacts_;
         --num_arcs_;
         has_final_ = true;

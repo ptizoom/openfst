@@ -28,7 +28,7 @@ struct ArcTpl {
  public:
   using Weight = W;
   using Label = int;
-  using StateId = int;
+  using StateId = unsigned int;
 
   Label ilabel;
   Label olabel;
@@ -63,7 +63,7 @@ struct StringArc {
  public:
   using Label = int;
   using Weight = StringWeight<int, S>;
-  using StateId = int;
+  using StateId = unsigned int;
 
   Label ilabel;
   Label olabel;
@@ -162,7 +162,7 @@ struct ReverseArc {
 template <class Weight1, class Weight2>
 struct LexicographicArc {
   using Label = int;
-  using StateId = int;
+  using StateId = unsigned int;
   using Weight = LexicographicWeight<Weight1, Weight2>;
 
   Label ilabel;
@@ -188,7 +188,7 @@ struct LexicographicArc {
 template <class Weight1, class Weight2>
 struct ProductArc {
   using Label = int;
-  using StateId = int;
+  using StateId = unsigned int;
   using Weight = ProductWeight<Weight1, Weight2>;
 
   Label ilabel;

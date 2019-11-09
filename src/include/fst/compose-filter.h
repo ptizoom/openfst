@@ -107,7 +107,8 @@ class NullComposeFilter {
   void SetState(StateId, StateId, const FilterState &) {}
 
   FilterState FilterArc(Arc *arc1, Arc *arc2) const {
-    return (arc1->olabel == kNoLabel || arc2->ilabel == kNoLabel)
+    //PTZ180829static_cast<Label>
+    return (arc1->olabel == static_cast<Label>(kNoLabel) || arc2->ilabel == static_cast<Label>(kNoLabel))
                ? FilterState::NoState()
                : FilterState(true);
   }
@@ -210,7 +211,8 @@ class SequenceComposeFilter {
         fst1_(matcher1_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+    //PTZ180829static_cast<StateId>  warning: overflow in conversion from ‘unsigned int’ to ‘signed char’ changes value from ‘4294967295’ to ‘-1’ [-Woverflow]
+        fs_(static_cast< bool >(kNoStateId)) {}
 
   SequenceComposeFilter(const SequenceComposeFilter<Matcher1, Matcher2> &filter,
                         bool safe = false)
@@ -219,7 +221,8 @@ class SequenceComposeFilter {
         fst1_(matcher1_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+   //PTZ180829static_cast<StateId>
+        fs_(static_cast< bool >(kNoStateId)) {}
 
   FilterState Start() const { return FilterState(0); }
 
@@ -236,10 +239,11 @@ class SequenceComposeFilter {
   }
 
   FilterState FilterArc(Arc *arc1, Arc *arc2) const {
-    if (arc1->olabel == kNoLabel) {
+    //PTZ180829static_cast<Label>
+    if (arc1->olabel == static_cast<Label>(kNoLabel)) {
       return alleps1_ ? FilterState::NoState() : noeps1_ ? FilterState(0)
                                                          : FilterState(1);
-    } else if (arc2->ilabel == kNoLabel) {
+    } else if (arc2->ilabel == static_cast<Label>(kNoLabel)) {
       return fs_ != FilterState(0) ? FilterState::NoState() : FilterState(0);
     } else {
       return arc1->olabel == 0 ? FilterState::NoState() : FilterState(0);
@@ -288,7 +292,8 @@ class AltSequenceComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+    //PTZ180829static_cast<StateId>
+        fs_(static_cast< bool >(kNoStateId)) {}
 
   AltSequenceComposeFilter(
       const AltSequenceComposeFilter<Matcher1, Matcher2> &filter,
@@ -298,7 +303,8 @@ class AltSequenceComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+   //PTZ180829static_cast<StateId>
+        fs_(static_cast< bool >(kNoStateId)) {}
 
   FilterState Start() const { return FilterState(0); }
 
@@ -315,10 +321,11 @@ class AltSequenceComposeFilter {
   }
 
   FilterState FilterArc(Arc *arc1, Arc *arc2) const {
-    if (arc2->ilabel == kNoLabel) {
+    //PTZ180829static_cast<Label>
+    if (arc2->ilabel == static_cast<Label>(kNoLabel)) {
       return alleps2_ ? FilterState::NoState() : noeps2_ ? FilterState(0)
-                                                         : FilterState(1);
-    } else if (arc1->olabel == kNoLabel) {
+                                                         : FilterState(1);      
+    } else if (arc1->olabel == static_cast<Label>(kNoLabel)) {
       return fs_ == FilterState(1) ? FilterState::NoState() : FilterState(0);
     } else {
       return arc1->olabel == 0 ? FilterState::NoState() : FilterState(0);
@@ -368,7 +375,7 @@ class MatchComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+    fs_(static_cast< bool >(kNoStateId)) {}
 
   MatchComposeFilter(const MatchComposeFilter<Matcher1, Matcher2> &filter,
                      bool safe = false)
@@ -378,7 +385,8 @@ class MatchComposeFilter {
         fst2_(matcher2_->GetFst()),
         s1_(kNoStateId),
         s2_(kNoStateId),
-        fs_(kNoStateId) {}
+    //PTZ180829static_cast<StateId>
+        fs_(static_cast< bool >(kNoStateId)) {}
 
   FilterState Start() const { return FilterState(0); }
 
@@ -400,14 +408,15 @@ class MatchComposeFilter {
   }
 
   FilterState FilterArc(Arc *arc1, Arc *arc2) const {
-    if (arc2->ilabel == kNoLabel) {  // Epsilon in FST1.
+    //PTZ180829static_cast<Label>
+    if (arc2->ilabel == static_cast< Label >(kNoLabel)) {  // Epsilon in FST1.
       return fs_ == FilterState(0)
                  ? (noeps2_
                         ? FilterState(0)
                         : (alleps2_ ? FilterState::NoState() : FilterState(1)))
                  : (fs_ == FilterState(1) ? FilterState(1)
                                           : FilterState::NoState());
-    } else if (arc1->olabel == kNoLabel) {  // Epsilon in FST2.
+    } else if (arc1->olabel == static_cast< Label >(kNoLabel)) {  // Epsilon in FST2.
       return fs_ == FilterState(0)
                  ? (noeps1_
                         ? FilterState(0)

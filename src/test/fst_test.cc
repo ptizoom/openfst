@@ -19,9 +19,9 @@ namespace {
 
 // A user-defined arc type.
 struct CustomArc {
-  typedef int16 Label;
+  typedef uint16 Label;
   typedef ProductWeight<TropicalWeight, LogWeight> Weight;
-  typedef int64 StateId;
+  typedef uint64 StateId;
 
   CustomArc(Label i, Label o, Weight w, StateId s)
       : ilabel(i), olabel(o), weight(std::move(w)), nextstate(s) {}

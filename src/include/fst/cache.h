@@ -513,7 +513,7 @@ class FirstCacheStore {
       store_ = store.store_;
       cache_gc_ = store.cache_gc_;
       cache_first_state_id_ = store.cache_first_state_id_;
-      cache_first_state_ = store.cache_first_state_id_ != kNoStateId
+      cache_first_state_ = store.cache_first_state_id_ != static_cast<StateId>(kNoStateId)
                                ? store_.GetMutableState(0)
                                : nullptr;
     }
@@ -535,7 +535,7 @@ class FirstCacheStore {
       return cache_first_state_;  // Request for first cached state.
     }
     if (cache_gc_) {
-      if (cache_first_state_id_ == kNoStateId) {
+        if (cache_first_state_id_ == static_cast<StateId>(kNoStateId)) {
         cache_first_state_id_ = s;  // Sets first cached state.
         cache_first_state_ = store_.GetMutableState(0);
         cache_first_state_->SetFlags(kCacheInit, kCacheInit);

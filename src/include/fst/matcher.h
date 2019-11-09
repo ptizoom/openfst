@@ -252,7 +252,7 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
       return false;
     }
     current_loop_ = match_label == 0;
-    match_label_ = match_label == kNoLabel ? 0 : match_label;
+    match_label_ = match_label == static_cast<Label>(kNoLabel) ? 0 : match_label;
     if (Search()) {
       return true;
     } else {

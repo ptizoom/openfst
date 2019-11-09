@@ -49,14 +49,14 @@ void Reverse(const Fst<FromArc> &ifst, MutableFst<ToArc> *ofst,
     for (StateIterator<Fst<FromArc>> siter(ifst); !siter.Done(); siter.Next()) {
       const auto s = siter.Value();
       if (ifst.Final(s) == FromWeight::Zero()) continue;
-      if (ostart != kNoStateId) {
+      if (ostart != static_cast<StateId>(kNoStateId)) {
         ostart = kNoStateId;
         break;
       } else {
         ostart = s;
       }
     }
-    if (ostart != kNoStateId && ifst.Final(ostart) != FromWeight::One()) {
+    if (ostart != static_cast<StateId>(kNoStateId) && ifst.Final(ostart) != FromWeight::One()) {
       std::vector<StateId> scc;
       SccVisitor<FromArc> scc_visitor(&scc, nullptr, nullptr, &dfs_iprops);
       DfsVisit(ifst, &scc_visitor);
@@ -71,10 +71,10 @@ void Reverse(const Fst<FromArc> &ifst, MutableFst<ToArc> *ofst,
           }
         }
       }
-      if (ostart != kNoStateId) dfs_oprops = kInitialAcyclic;
+      if (ostart != static_cast<StateId>(kNoStateId)) dfs_oprops = kInitialAcyclic;
     }
   }
-  if (ostart == kNoStateId) {  // Super-initial requested or needed.
+  if (ostart == static_cast<StateId>(kNoStateId)) {  // Super-initial requested or needed.
     ostart = ofst->AddState();
     offset = 1;
   }

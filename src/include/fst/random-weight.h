@@ -21,6 +21,9 @@
 #include <fst/string-weight.h>
 #include <fst/union-weight.h>
 
+#if ! defined(GALLIC_STRING_TYPE)
+#define GALLIC_STRING_TYPE(_t) GallicStringType(_t)
+#endif
 
 namespace fst {
 

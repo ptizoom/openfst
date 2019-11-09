@@ -108,7 +108,7 @@ class ShortestDistanceState {
 template <class Arc, class Queue, class ArcFilter>
 void ShortestDistanceState<Arc, Queue, ArcFilter>::ShortestDistance(
     StateId source) {
-  if (fst_.Start() == kNoStateId) {
+  if (fst_.Start() == static_cast<StateId>(kNoStateId)) {
     if (fst_.Properties(kError, false)) error_ = true;
     return;
   }
@@ -131,7 +131,7 @@ void ShortestDistanceState<Arc, Queue, ArcFilter>::ShortestDistance(
     radder_.clear();
     enqueued_.clear();
   }
-  if (source == kNoStateId) source = fst_.Start();
+  if (source == static_cast<StateId>(kNoStateId)) source = fst_.Start();
   while (distance_->size() <= source) {
     distance_->push_back(Weight::Zero());
     adder_.push_back(Adder<Weight>());
@@ -275,7 +275,7 @@ void ShortestDistance(const Fst<Arc> &fst,
                       std::vector<typename Arc::Weight> *distance,
                       bool reverse = false, float delta = kShortestDelta) {
   using StateId = typename Arc::StateId;
-  //PTZ191108 not using Weight = typename Arc::Weight;
+  using Weight ATTRIBUTE_UNUSED = typename Arc::Weight;
   if (!reverse) {
     AnyArcFilter<Arc> arc_filter;
     AutoQueue<StateId> state_queue(fst, distance, arc_filter);
