@@ -11,13 +11,12 @@
 namespace fst {
 namespace script {
 
-typedef args::Package<const FstClass &, MutableFstClass *> SynchronizeArgs;
+using SynchronizeArgs = args::Package<const FstClass &, MutableFstClass *>;
 
 template <class Arc>
 void Synchronize(SynchronizeArgs *args) {
   const Fst<Arc> &ifst = *(args->arg1.GetFst<Arc>());
   MutableFst<Arc> *ofst = args->arg2->GetMutableFst<Arc>();
-
   Synchronize(ifst, ofst);
 }
 

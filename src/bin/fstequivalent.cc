@@ -3,20 +3,29 @@
 //
 // Two DFAs are equivalent iff their exit status is zero.
 
-#include <memory>
+#include <unistd.h>
 
+#include <climits>
+#include <cstring>
+#include <ctime>
+
+#include <memory>
+#include <string>
+
+#include <fst/log.h>
 #include <fst/script/equivalent.h>
+#include <fst/script/getters.h>
 #include <fst/script/randequivalent.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
 DEFINE_bool(random, false,
             "Test equivalence by randomly selecting paths in the input FSTs");
-DEFINE_int32(max_length, INT_MAX, "Maximum path length");
+DEFINE_int32(max_length, INT32_MAX, "Maximum path length");
 DEFINE_int32(npath, 1, "Number of paths to generate");
-DEFINE_int32(seed, time(0), "Random seed");
+DEFINE_int32(seed, time(nullptr) + getpid(), "Random seed");
 DEFINE_string(select, "uniform",
               "Selection type: one of: "
-              " \"uniform\", \"log_prob (when appropriate),"
+              " \"uniform\", \"log_prob\" (when appropriate),"
               " \"fast_log_prob\" (when appropriate)");
 
 int main(int argc, char **argv) {
@@ -36,11 +45,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in1_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
-  string in2_name = strcmp(argv[2], "-") == 0 ? "" : argv[2];
+  const string in1_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
+  const string in2_name = strcmp(argv[2], "-") == 0 ? "" : argv[2];
 
   if (in1_name.empty() && in2_name.empty()) {
-    LOG(ERROR) << argv[0] << ": Can't take both inputs from standard input.";
+    LOG(ERROR) << argv[0] << ": Can't take both inputs from standard input";
     return 1;
   }
 
@@ -52,29 +61,19 @@ int main(int argc, char **argv) {
 
   if (!FLAGS_random) {
     bool result = s::Equivalent(*ifst1, *ifst2, FLAGS_delta);
-    if (!result) VLOG(1) << "FSTs are not equivalent.";
-
+    if (!result) VLOG(1) << "FSTs are not equivalent";
     return result ? 0 : 2;
   } else {
     s::RandArcSelection ras;
-
-    if (FLAGS_select == "uniform") {
-      ras = s::UNIFORM_ARC_SELECTOR;
-    } else if (FLAGS_select == "log_prob") {
-      ras = s::LOG_PROB_ARC_SELECTOR;
-    } else if (FLAGS_select == "fast_log_prob") {
-      ras = s::FAST_LOG_PROB_ARC_SELECTOR;
-    } else {
-      LOG(ERROR) << argv[0] << ": Unknown selection type \"" << FLAGS_select
-                 << "\"\n";
+    if (!s::GetRandArcSelection(FLAGS_select, &ras)) {
+      LOG(ERROR) << argv[0] << ": Unknown or unsupported select type "
+                            << FLAGS_select;
       return 1;
     }
-
     bool result = s::RandEquivalent(
-        *ifst1, *ifst2, FLAGS_seed, FLAGS_npath, FLAGS_delta,
+        *ifst1, *ifst2, FLAGS_npath, FLAGS_delta, FLAGS_seed,
         fst::RandGenOptions<s::RandArcSelection>(ras, FLAGS_max_length));
-    if (!result) VLOG(1) << "FSTs are not equivalent.";
-
+    if (!result) VLOG(1) << "FSTs are not equivalent";
     return result ? 0 : 2;
   }
 }

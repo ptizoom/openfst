@@ -3,9 +3,13 @@
 //
 // Epsilon-normalizes an FST.
 
+#include <cstring>
+
 #include <memory>
+#include <string>
 
 #include <fst/script/epsnormalize.h>
+#include <fst/script/getters.h>
 
 DEFINE_bool(eps_norm_output, false, "Normalize output epsilons");
 
@@ -25,18 +29,16 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<FstClass> ifst(FstClass::Read(in_name));
   if (!ifst) return 1;
 
-  fst::EpsNormalizeType eps_norm_type = FLAGS_eps_norm_output
-                                                ? fst::EPS_NORM_OUTPUT
-                                                : fst::EPS_NORM_INPUT;
-
   VectorFstClass ofst(ifst->ArcType());
-  s::EpsNormalize(*ifst, &ofst, eps_norm_type);
+
+  s::EpsNormalize(*ifst, &ofst, s::GetEpsNormalizeType(FLAGS_eps_norm_output));
+
   ofst.Write(out_name);
 
   return 0;

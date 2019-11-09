@@ -1,6 +1,7 @@
 #ifndef FST_TEST_RAND_FST_H_
 #define FST_TEST_RAND_FST_H_
 
+#include <fst/log.h>
 #include <fst/mutable-fst.h>
 #include <fst/verify.h>
 
@@ -8,12 +9,9 @@ namespace fst {
 
 // Generates a random FST.
 template <class Arc, class WeightGenerator>
-void RandFst(const int num_random_states,
-             const int num_random_arcs,
-             const int num_random_labels,
-             const float acyclic_prob,
-             WeightGenerator *weight_generator,
-             MutableFst<Arc> *fst) {
+void RandFst(const int num_random_states, const int num_random_arcs,
+             const int num_random_labels, const float acyclic_prob,
+             WeightGenerator *weight_generator, MutableFst<Arc> *fst) {
   typedef typename Arc::Label Label;
   typedef typename Arc::StateId StateId;
   typedef typename Arc::Weight Weight;

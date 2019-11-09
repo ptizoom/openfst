@@ -1,12 +1,17 @@
-AC_INIT([OpenFst], [1.5.3], [help@www.openfst.org])
-
-AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror])
+AC_INIT([OpenFst], [1.6.2], [help@www.openfst.org])
+AM_INIT_AUTOMAKE([foreign nostdinc -Wall -Werror subdir-objects])
 AM_MAINTAINER_MODE
 
 dnl PTZ180615  configure.ac:1861: error: AM_COND_IF: no such condition "COND_OPENFST" as used inside parent projects.
 AM_CONDITIONAL([COND_OPENFST],[test -z ""])
 
 AM_PROG_AR
+
+# OpenFst does not throw exceptions, so we do not generate exception handling
+# code. However, users are free to re-enable exception handling.
+# OpenFst assumes char is unsigned; -fsigned-char is likely unsafe.
+#CPPFLAGS="$CPPFLAGS -fno-exceptions -funsigned-char"
+#CXXFLAGS="$CXXFLAGS -std=c++11"
 
 AC_PROG_CXX
 AC_DISABLE_STATIC
@@ -32,6 +37,7 @@ AC_CONFIG_FILES([
   src/extensions/ngram/Makefile
   src/extensions/pdt/Makefile
   src/extensions/python/Makefile
+  src/extensions/special/Makefile
   src/script/Makefile
 ])
 AC_CONFIG_MACRO_DIR([m4])
@@ -135,6 +141,30 @@ if test "x$enable_python" != xno; then
   AM_PATH_PYTHON(2.7)
   AC_PYTHON_DEVEL([>= '2.7'])
 fi
+
+AC_ARG_ENABLE([special],
+              [AS_HELP_STRING([--enable-special],
+              [enable special-matcher extensions])],
+              [],
+              [enable_special=no])
+AM_CONDITIONAL([HAVE_SPECIAL], [test "x$enable_special" != xno])
+
+# --enable-bin enables script and bin "extensions".
+AC_ARG_ENABLE([bin],
+              [AS_HELP_STRING([--enable-bin],
+              [enable fst::script and command-line binaries])],
+              [],
+              [enable_bin=yes])
+AM_CONDITIONAL([HAVE_BIN], [test "x$enable_bin" != xno])
+AM_CONDITIONAL([HAVE_SCRIPT], [test "x$enable_bin" != xno])
+
+# --enable-grm enables dependencies of OpenGrm: far, mpdt, and pdt.
+AC_ARG_ENABLE([grm],
+              [AS_HELP_STRING([--enable-grm],
+              [enable all dependencies of OpenGrm])],
+              [],
+              [enable_grm=no])
+AM_CONDITIONAL([HAVE_GRM], [test "x$enable_grm" != xno])
 
 AC_ARG_WITH([libfstdir],
 [--with-libfstdir[=DIR] fst dynamic extensions [[LIBDIR/fst]]],

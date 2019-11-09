@@ -5,11 +5,6 @@
 #include <fst/script/determinize.h>
 #include <fst/script/script-impl.h>
 
-#if defined __CYGWIN__
-#pragma GCC push_options
-#pragma GCC optimize ("Og")
-#endif
-
 namespace fst {
 namespace script {
 
@@ -46,7 +41,3 @@ REGISTER_FST_OPERATION(Determinize, Log64Arc, DeterminizeArgs2);
 
 }  // namespace script
 }  // namespace fst
-
-#if defined __CYGWIN__
-#pragma GCC pop_options
-#endif

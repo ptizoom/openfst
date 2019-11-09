@@ -1,3 +1,16 @@
+OpenFst: Release 1.6
+    * Finalizes most virtual overrides (1.6.2)
+    * Fixes missing includes of <fst/log.h> (1.6.1)
+    * Adds float format support to FST drawing (1.6.1)
+    * Extensive modernization for C++11 style (1.6.0)
+    * Many classes and constants moved into an internal namespace (1.6.0)
+    * Adds HashMatcher (1.6.0)
+    * Adds Member method to SymbolTable (1.6.0)
+    * Adds the "special" extension and the fstspecial binary; this is similar to
+      fstconvert but accepts arguments for specifying special labels (phi, rho,
+      and sigma) of FSTs (1.6.0)
+    * Exposes allow_negative_label option for Python symbol tables (1.6.0)
+
 OpenFst: Release 1.5
     * Added p-subsequential determinization (1.5.0)
     * Generalized epsilon normalization to non-functional case (1.5.0)
@@ -57,6 +70,14 @@ OpenFst: Release 1.5
     * Mutation methods of the Python Fst object now support chaining (1.5.3)
     * Scripting API and Python weight objects now support semiring arithmetic
       (1.5.3)
+    * Adds RemoveSymbol method to SymbolTable (1.5.4)
+    * Prevents underflow when using LogProbArcSelector in random generation
+      (1.5.4)
+    * Makes random weight generators a single template class (1.5.4)
+    * Makes weight Properties constexpr where possible (1.5.4)
+    * Adds check for error when opening files when compiling strings into FARs
+      (1.5.4)
+    * Adds routines for parsing string flags to the scripting API (1.5.4)
 
 OpenFst: Release 1.4
     * Port to C++11 (1.4.0)

@@ -1,5 +1,8 @@
 AM_CPPFLAGS = -I$(srcdir)/../include -I$(srcdir)/../script $(ICU_FLAGS)
-LDADD = ../script/libfstscript.la ../lib/libopenfst.la -lm $(DL_LIBS)
+#LDADD = ../script/libfstscript.la ../lib/libopenfst.la -lm $(DL_LIBS)
+#PTZ191107 for I have merged all in openfst! ba ouai hun? but does not seemm to link in
+LDADD =  $(builddir)/../lib/libopenfst.la -lm $(DL_LIBS)
+LDADD += $(builddir)/../script/libfstscript.la
 
 if HAVE_BIN
 bin_PROGRAMS = fstarcsort fstclosure fstcompile fstcompose fstconcat \

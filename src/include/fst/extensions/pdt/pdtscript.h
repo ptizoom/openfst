@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include <fst/log.h>
 #include <fst/compose.h>  // for ComposeOptions
 #include <fst/util.h>
 
@@ -28,12 +29,10 @@
 namespace fst {
 namespace script {
 
-// PDT COMPOSE
-
-
-typedef args::Package<const FstClass &, const FstClass &,
-                      const std::vector<LabelPair> &, MutableFstClass *,
-                      const PdtComposeOptions &, bool> PdtComposeArgs;
+using PdtComposeArgs =
+    args::Package<const FstClass &, const FstClass &,
+                  const std::vector<LabelPair> &, MutableFstClass *,
+                  const PdtComposeOptions &, bool>;
 
 template <class Arc>
 void PdtCompose(PdtComposeArgs *args) {
@@ -58,8 +57,6 @@ void PdtCompose(const FstClass &ifst1, const FstClass &ifst2,
                 MutableFstClass *ofst, const PdtComposeOptions &opts,
                 bool left_pdt);
 
-// PDT EXPAND
-
 struct PdtExpandOptions {
   bool connect;
   bool keep_parentheses;
@@ -69,9 +66,9 @@ struct PdtExpandOptions {
       : connect(c), keep_parentheses(k), weight_threshold(w) {}
 };
 
-typedef args::Package<const FstClass &, const std::vector<LabelPair> &,
-                      MutableFstClass *,
-                      const PdtExpandOptions &> PdtExpandArgs;
+using PdtExpandArgs =
+    args::Package<const FstClass &, const std::vector<LabelPair> &,
+                  MutableFstClass *, const PdtExpandOptions &>;
 
 template <class Arc>
 void PdtExpand(PdtExpandArgs *args) {
@@ -96,11 +93,10 @@ void PdtExpand(const FstClass &ifst, const std::vector<LabelPair> &parens,
                MutableFstClass *ofst, bool connect, bool keep_parentheses,
                const WeightClass &weight_threshold);
 
-// PDT REPLACE
-
-typedef args::Package<const std::vector<LabelFstClassPair> &, MutableFstClass *,
-                      std::vector<LabelPair> *, int64, PdtParserType, int64,
-                      string, string> PdtReplaceArgs;
+using PdtReplaceArgs =
+    args::Package<const std::vector<LabelFstClassPair> &, MutableFstClass *,
+                  std::vector<LabelPair> *, int64, PdtParserType, int64,
+                  const string &, const string &>;
 
 template <class Arc>
 void PdtReplace(PdtReplaceArgs *args) {
@@ -108,7 +104,7 @@ void PdtReplace(PdtReplaceArgs *args) {
   auto size = untyped_pairs.size();
   std::vector<std::pair<typename Arc::Label, const Fst<Arc> *>> typed_pairs(
       size);
-  for (auto i = 0; i < size; ++i) {
+  for (size_t i = 0; i < size; ++i) {
     typed_pairs[i].first = untyped_pairs[i].first;
     typed_pairs[i].second = untyped_pairs[i].second->GetFst<Arc>();
   }
@@ -126,13 +122,12 @@ void PdtReplace(const std::vector<LabelFstClassPair> &pairs,
                 MutableFstClass *ofst, std::vector<LabelPair> *parens,
                 int64 root, PdtParserType parser_type = PDT_LEFT_PARSER,
                 int64 start_paren_labels = kNoLabel,
-                string left_paren_prefix = "(_",
-                string right_paren_prefix = "_)");
+                const string &left_paren_prefix = "(_",
+                const string &right_paren_prefix = "_)");
 
-// PDT REVERSE
-
-typedef args::Package<const FstClass &, const std::vector<LabelPair> &,
-                      MutableFstClass *> PdtReverseArgs;
+using PdtReverseArgs =
+    args::Package<const FstClass &, const std::vector<LabelPair> &,
+                  MutableFstClass *>;
 
 template <class Arc>
 void PdtReverse(PdtReverseArgs *args) {
@@ -162,9 +157,9 @@ struct PdtShortestPathOptions {
       : queue_type(qt), keep_parentheses(kp), path_gc(gc) {}
 };
 
-typedef args::Package<const FstClass &, const std::vector<LabelPair> &,
-                      MutableFstClass *,
-                      const PdtShortestPathOptions &> PdtShortestPathArgs;
+using PdtShortestPathArgs =
+    args::Package<const FstClass &, const std::vector<LabelPair> &,
+                  MutableFstClass *, const PdtShortestPathOptions &>;
 
 template <class Arc>
 void PdtShortestPath(PdtShortestPathArgs *args) {
@@ -210,8 +205,8 @@ void PdtShortestPath(const FstClass &ifst,
 
 // PRINT INFO
 
-typedef args::Package<const FstClass &,
-                      const std::vector<LabelPair> &> PrintPdtInfoArgs;
+using PrintPdtInfoArgs =
+    args::Package<const FstClass &, const std::vector<LabelPair> &>;
 
 template <class Arc>
 void PrintPdtInfo(PrintPdtInfoArgs *args) {

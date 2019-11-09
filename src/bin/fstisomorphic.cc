@@ -5,8 +5,12 @@
 // exit status is zero. FSTs should be deterministic when viewed as unweighted
 // automata.
 
-#include <memory>
+#include <cstring>
 
+#include <memory>
+#include <string>
+
+#include <fst/log.h>
 #include <fst/script/isomorphic.h>
 
 DEFINE_double(delta, fst::kDelta, "Comparison/quantization delta");
@@ -27,11 +31,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in1_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
-  string in2_name = strcmp(argv[2], "-") == 0 ? "" : argv[2];
+  const string in1_name = strcmp(argv[1], "-") == 0 ? "" : argv[1];
+  const string in2_name = strcmp(argv[2], "-") == 0 ? "" : argv[2];
 
   if (in1_name.empty() && in2_name.empty()) {
-    LOG(ERROR) << argv[0] << ": Can't take both inputs from standard input.";
+    LOG(ERROR) << argv[0] << ": Can't take both inputs from standard input";
     return 1;
   }
 
@@ -42,7 +46,7 @@ int main(int argc, char **argv) {
   if (!ifst2) return 1;
 
   bool result = s::Isomorphic(*ifst1, *ifst2, FLAGS_delta);
-  if (!result) VLOG(1) << "FSTs are not isomorphic.";
+  if (!result) VLOG(1) << "FSTs are not isomorphic";
 
   return result ? 0 : 2;
 }

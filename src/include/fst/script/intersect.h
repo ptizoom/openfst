@@ -12,28 +12,26 @@
 namespace fst {
 namespace script {
 
-typedef args::Package<const FstClass &, const FstClass &, MutableFstClass *,
-                      ComposeFilter> IntersectArgs1;
+using IntersectArgs1 = args::Package<const FstClass &, const FstClass &,
+                                     MutableFstClass *, ComposeFilter>;
 
 template <class Arc>
 void Intersect(IntersectArgs1 *args) {
   const Fst<Arc> &ifst1 = *(args->arg1.GetFst<Arc>());
   const Fst<Arc> &ifst2 = *(args->arg2.GetFst<Arc>());
   MutableFst<Arc> *ofst = args->arg3->GetMutableFst<Arc>();
-
-  Intersect(ifst1, ifst2, ofst, args->arg4);
+  Intersect(ifst1, ifst2, ofst, ComposeOptions(args->arg4));
 }
 
-typedef args::Package<const FstClass &, const FstClass &, MutableFstClass *,
-                      const ComposeOptions &> IntersectArgs2;
+using IntersectArgs2 = args::Package<const FstClass &, const FstClass &,
+                                     MutableFstClass *, const ComposeOptions &>;
 
 template <class Arc>
 void Intersect(IntersectArgs2 *args) {
   const Fst<Arc> &ifst1 = *(args->arg1.GetFst<Arc>());
   const Fst<Arc> &ifst2 = *(args->arg2.GetFst<Arc>());
   MutableFst<Arc> *ofst = args->arg3->GetMutableFst<Arc>();
-
-  Intersect(ifst1, ifst2, ofst, args->arg4);
+  Intersect(ifst1, ifst2, ofst, ComposeOptions(args->arg4));
 }
 
 void Intersect(const FstClass &ifst1, const FstClass &ifst2,

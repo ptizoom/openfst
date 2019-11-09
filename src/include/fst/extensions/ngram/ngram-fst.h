@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <fst/compat.h>
+#include <fst/log.h>
 #include <fstream>
 #include <fst/extensions/ngram/bitmap-index.h>
 #include <fst/fstlib.h>
@@ -48,7 +49,9 @@ struct NGramFstInst {
         context_state_(kNoStateId) {}
 };
 
-// Implementation class for LOUDS based NgramFst interface
+namespace internal {
+
+// Implementation class for LOUDS based NgramFst interface.
 template <class A>
 class NGramFstImpl : public FstImpl<A> {
   using FstImpl<A>::SetInputSymbols;
@@ -78,11 +81,17 @@ class NGramFstImpl : public FstImpl<A> {
 
   NGramFstImpl(const Fst<A> &fst, std::vector<StateId> *order_out);
 
+  explicit NGramFstImpl(const Fst<A> &fst) : NGramFstImpl(fst, nullptr) {}
+
+  NGramFstImpl(const NGramFstImpl &other) {
+    FSTERROR() << "Copying NGramFst Impls is not supported, use safe = false.";
+    SetProperties(kError, kError);
+  }
+
   ~NGramFstImpl() override {
     if (owned_) {
       delete[] data_;
     }
-    delete data_region_;
   }
 
   static NGramFstImpl<A> *Read(std::istream &strm,  // NOLINT
@@ -246,7 +255,7 @@ class NGramFstImpl : public FstImpl<A> {
   // Minimum file format version supported.
   static const int kMinFileVersion = 4;
 
-  MappedFile *data_region_ = nullptr;
+  std::unique_ptr<MappedFile> data_region_;
   const char *data_ = nullptr;
   bool owned_ = false;  // True if we own data_
   StateId start_ = fst::kNoStateId;
@@ -267,8 +276,6 @@ class NGramFstImpl : public FstImpl<A> {
   BitmapIndex context_index_;
   BitmapIndex future_index_;
   BitmapIndex final_index_;
-
-  void operator=(const NGramFstImpl<A> &);  // Disallow
 };
 
 template <typename A>
@@ -312,9 +319,11 @@ inline void NGramFstImpl<A>::GetStates(
   }
 }
 
+}  // namespace internal
+
 /*****************************************************************************/
 template <class A>
-class NGramFst : public ImplToExpandedFst<NGramFstImpl<A>> {
+class NGramFst : public ImplToExpandedFst<internal::NGramFstImpl<A>> {
   friend class ArcIterator<NGramFst<A>>;
   friend class NGramFstMatcher<A>;
 
@@ -323,7 +332,7 @@ class NGramFst : public ImplToExpandedFst<NGramFstImpl<A>> {
   typedef typename A::StateId StateId;
   typedef typename A::Label Label;
   typedef typename A::Weight Weight;
-  typedef NGramFstImpl<A> Impl;
+  typedef internal::NGramFstImpl<A> Impl;
 
   explicit NGramFst(const Fst<A> &dst)
       : ImplToExpandedFst<Impl>(std::make_shared<Impl>(dst, nullptr)) {}
@@ -458,6 +467,8 @@ inline void NGramFst<A>::InitArcIterator(StateId s,
   GetImpl()->SetInstNode(&inst_);
   data->base = new ArcIterator<NGramFst<A>>(*this, s);
 }
+
+namespace internal {
 
 template <typename A>
 NGramFstImpl<A>::NGramFstImpl(const Fst<A> &fst,
@@ -643,10 +654,10 @@ NGramFstImpl<A>::NGramFstImpl(const Fst<A> &fst,
       (*order_out)[state] = state_number;
     }
 
-    const Weight & final = context_fst.Final(state);
-    if (final != Weight::Zero()) {
+    const Weight final_weight = context_fst.Final(state);
+    if (final_weight != Weight::Zero()) {
       BitmapIndex::Set(final_bits, state_number);
-      final_probs[final_bit] = final;
+      final_probs[final_bit] = final_weight;
       ++final_bit;
     }
 
@@ -693,8 +704,7 @@ inline void NGramFstImpl<A>::Init(const char *data, bool owned,
   if (owned_) {
     delete[] data_;
   }
-  delete data_region_;
-  data_region_ = data_region;
+  data_region_.reset(data_region);
   owned_ = owned;
   data_ = data;
   size_t offset = 0;
@@ -777,6 +787,8 @@ inline typename A::StateId NGramFstImpl<A>::Transition(
   return context_index_.Rank1(node);
 }
 
+}  // namespace internal
+
 /*****************************************************************************/
 template <class A>
 class NGramFstMatcher : public MatcherBase<A> {
@@ -818,13 +830,12 @@ class NGramFstMatcher : public MatcherBase<A> {
 
   uint64 Properties(uint64 props) const override { return props; }
 
- private:
-  void SetState_(StateId s) override {
+  void SetState(StateId s) final {
     fst_.GetImpl()->SetInstFuture(s, &inst_);
     current_loop_ = false;
   }
 
-  bool Find_(Label label) override {
+  bool Find(Label label) final {
     const Label nolabel = kNoLabel;
     done_ = true;
     if (label == 0 || label == nolabel) {
@@ -856,14 +867,14 @@ class NGramFstMatcher : public MatcherBase<A> {
         done_ = false;
       }
     }
-    return !Done_();
+    return !Done();
   }
 
-  bool Done_() const override { return !current_loop_ && done_; }
+  bool Done() const final { return !current_loop_ && done_; }
 
-  const Arc &Value_() const override { return (current_loop_) ? loop_ : arc_; }
+  const Arc &Value() const final { return (current_loop_) ? loop_ : arc_; }
 
-  void Next_() override {
+  void Next() final {
     if (current_loop_) {
       current_loop_ = false;
     } else {
@@ -871,8 +882,9 @@ class NGramFstMatcher : public MatcherBase<A> {
     }
   }
 
-  ssize_t Priority_(StateId s) override { return fst_.NumArcs(s); }
+  ssize_t Priority(StateId s) final { return fst_.NumArcs(s); }
 
+ private:
   const NGramFst<A> &fst_;
   NGramFstInst<A> inst_;
   MatchType match_type_;  // Supplied by caller
@@ -880,6 +892,31 @@ class NGramFstMatcher : public MatcherBase<A> {
   Arc arc_;
   bool current_loop_;  // Current arc is the implicit loop
   Arc loop_;
+};
+
+/*****************************************************************************/
+// Specialization for NGramFst; see generic version in fst.h
+// for sample usage (but use the ProdLmFst type!). This version
+// should inline.
+template <class A>
+class StateIterator<NGramFst<A>> : public StateIteratorBase<A> {
+ public:
+  typedef typename A::StateId StateId;
+
+  explicit StateIterator(const NGramFst<A> &fst)
+      : s_(0), num_states_(fst.NumStates()) {}
+
+  bool Done() const final { return s_ >= num_states_; }
+
+  StateId Value() const final { return s_; }
+
+  void Next() final { ++s_; }
+
+  void Reset() final { s_ = 0; }
+
+ private:
+  StateId s_;
+  StateId num_states_;
 };
 
 /*****************************************************************************/
@@ -898,12 +935,12 @@ class ArcIterator<NGramFst<A>> : public ArcIteratorBase<A> {
     impl_->SetInstNode(&inst_);
   }
 
-  bool Done() const {
+  bool Done() const final {
     return i_ >=
            ((inst_.node_ == 0) ? inst_.num_futures_ : inst_.num_futures_ + 1);
   }
 
-  const Arc &Value() const {
+  const Arc &Value() const final {
     bool eps = (inst_.node_ != 0 && i_ == 0);
     StateId state = (inst_.node_ == 0) ? i_ : i_ - 1;
     if (flags_ & lazy_ & (kArcILabelValue | kArcOLabelValue)) {
@@ -933,79 +970,40 @@ class ArcIterator<NGramFst<A>> : public ArcIteratorBase<A> {
     return arc_;
   }
 
-  void Next() {
+  void Next() final {
     ++i_;
     lazy_ = ~0;
   }
 
-  size_t Position() const { return i_; }
+  size_t Position() const final { return i_; }
 
-  void Reset() {
+  void Reset() final {
     i_ = 0;
     lazy_ = ~0;
   }
 
-  void Seek(size_t a) {
+  void Seek(size_t a) final {
     if (i_ != a) {
       i_ = a;
       lazy_ = ~0;
     }
   }
 
-  uint32 Flags() const { return flags_; }
+  uint32 Flags() const final { return flags_; }
 
-  void SetFlags(uint32 f, uint32 m) {
-    flags_ &= ~m;
-    flags_ |= (f & kArcValueFlags);
+  void SetFlags(uint32 flags, uint32 mask) final {
+    flags_ &= ~mask;
+    flags_ |= (flags & kArcValueFlags);
   }
 
  private:
-  bool Done_() const override { return Done(); }
-  const Arc &Value_() const override { return Value(); }
-  void Next_() override { Next(); }
-  size_t Position_() const override { return Position(); }
-  void Reset_() override { Reset(); }
-  void Seek_(size_t a) override { Seek(a); }
-  uint32 Flags_() const override { return Flags(); }
-  void SetFlags_(uint32 f, uint32 m) override { SetFlags(f, m); }
-
   mutable Arc arc_;
   mutable uint32 lazy_;
-  const NGramFstImpl<A> *impl_;
+  const internal::NGramFstImpl<A> *impl_;  // Borrowed reference.
   mutable NGramFstInst<A> inst_;
 
   size_t i_;
   uint32 flags_;
-
-  DISALLOW_COPY_AND_ASSIGN(ArcIterator);
-};
-
-/*****************************************************************************/
-// Specialization for NGramFst; see generic version in fst.h
-// for sample usage (but use the ProdLmFst type!). This version
-// should inline.
-template <class A>
-class StateIterator<NGramFst<A>> : public StateIteratorBase<A> {
- public:
-  typedef typename A::StateId StateId;
-
-  explicit StateIterator(const NGramFst<A> &fst)
-      : s_(0), num_states_(fst.NumStates()) {}
-
-  bool Done() const { return s_ >= num_states_; }
-  StateId Value() const { return s_; }
-  void Next() { ++s_; }
-  void Reset() { s_ = 0; }
-
- private:
-  bool Done_() const override { return Done(); }
-  StateId Value_() const override { return Value(); }
-  void Next_() override { Next(); }
-  void Reset_() override { Reset(); }
-
-  StateId s_, num_states_;
-
-  DISALLOW_COPY_AND_ASSIGN(StateIterator);
 };
 
 }  // namespace fst

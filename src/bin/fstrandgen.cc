@@ -3,13 +3,22 @@
 //
 // Generates random paths through an FST.
 
-#include <memory>
+#include <unistd.h>
 
+#include <climits>
+#include <cstring>
+#include <ctime>
+
+#include <memory>
+#include <string>
+
+#include <fst/log.h>
+#include <fst/script/getters.h>
 #include <fst/script/randgen.h>
 
-DEFINE_int32(max_length, INT_MAX, "Maximum path length");
+DEFINE_int32(max_length, INT32_MAX, "Maximum path length");
 DEFINE_int32(npath, 1, "Number of paths to generate");
-DEFINE_int32(seed, time(0), "Random seed");
+DEFINE_int32(seed, time(nullptr) + getpid(), "Random seed");
 DEFINE_string(select, "uniform",
               "Selection type: one of: "
               " \"uniform\", \"log_prob\" (when appropriate),"
@@ -37,8 +46,8 @@ int main(int argc, char **argv) {
 
   VLOG(1) << argv[0] << ": Seed = " << FLAGS_seed;
 
-  string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name = (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<FstClass> ifst(FstClass::Read(in_name));
   if (!ifst) return 1;
@@ -46,16 +55,9 @@ int main(int argc, char **argv) {
   VectorFstClass ofst(ifst->ArcType());
 
   s::RandArcSelection ras;
-
-  if (FLAGS_select == "uniform") {
-    ras = s::UNIFORM_ARC_SELECTOR;
-  } else if (FLAGS_select == "log_prob") {
-    ras = s::LOG_PROB_ARC_SELECTOR;
-  } else if (FLAGS_select == "fast_log_prob") {
-    ras = s::FAST_LOG_PROB_ARC_SELECTOR;
-  } else {
-    LOG(ERROR) << argv[0] << ": Unknown selection type \"" << FLAGS_select
-               << "\"\n";
+  if (!s::GetRandArcSelection(FLAGS_select, &ras)) {
+    LOG(ERROR) << argv[0] << ": Unknown or unsupported select type "
+               << FLAGS_select;
     return 1;
   }
 

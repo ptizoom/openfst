@@ -11,12 +11,11 @@
 namespace fst {
 namespace script {
 
-typedef args::Package<MutableFstClass *, ProjectType> ProjectArgs;
+using ProjectArgs = args::Package<MutableFstClass *, ProjectType>;
 
 template <class Arc>
 void Project(ProjectArgs *args) {
   MutableFst<Arc> *ofst = args->arg1->GetMutableFst<Arc>();
-
   Project(ofst, args->arg2);
 }
 

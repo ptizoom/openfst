@@ -3,7 +3,10 @@
 //
 // Reverses the paths in an FST.
 
+#include <cstring>
+
 #include <memory>
+#include <string>
 
 #include <fst/script/fst-class.h>
 #include <fst/script/reverse.h>
@@ -26,8 +29,9 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  string in_name = (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
-  string out_name = argc > 2 ? argv[2] : "";
+  const string in_name =
+      (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
+  const string out_name = argc > 2 ? argv[2] : "";
 
   std::unique_ptr<FstClass> ifst(FstClass::Read(in_name));
   if (!ifst) return 1;
