@@ -26,8 +26,14 @@ bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
   const auto *osyms = fst.OutputSymbols();
   // Count states
   StateId ns = 0;
-  for (StateIterator<Fst<Arc>> siter(fst); !siter.Done(); siter.Next()) ++ns;
-  if (start == kNoStateId && ns > 0) {
+  for (StateIterator<Fst<Arc>> siter(fst)
+	 ; !siter.Done()
+	   && ns != kNoStateId
+	 ; siter.Next()) ++ns;
+  if (ns == kNoStateId) {
+    LOG(ERROR) << "Verify: reached kNoStateId ; FST has too many state ID";
+    return false;
+  } else if (start == kNoStateId && ns > 0) {
     LOG(ERROR) << "Verify: FST start state ID not set";
     return false;
   } else if (start >= ns) {

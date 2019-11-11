@@ -815,7 +815,7 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
         cache_start_(kNoStateId),
         nknown_states_(0),
         min_unexpanded_state_id_(0),
-        max_expanded_state_id_(-1),
+        max_expanded_state_id_(kNoStateId),
         cache_gc_(opts.gc),
         cache_limit_(opts.gc_limit),
         cache_store_(new CacheStore(opts)),
@@ -827,7 +827,7 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
         cache_start_(kNoStateId),
         nknown_states_(0),
         min_unexpanded_state_id_(0),
-        max_expanded_state_id_(-1),
+        max_expanded_state_id_(kNoStateId),
         cache_gc_(opts.gc),
         cache_limit_(opts.gc_limit),
         cache_store_(opts.store ? opts.store : new CacheStore(CacheOptions(
@@ -844,7 +844,7 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
         cache_start_(kNoStateId),
         nknown_states_(0),
         min_unexpanded_state_id_(0),
-        max_expanded_state_id_(-1),
+        max_expanded_state_id_(kNoStateId),
         cache_gc_(impl.cache_gc_),
         cache_limit_(impl.cache_limit_),
         cache_store_(new CacheStore(CacheOptions(cache_gc_, cache_limit_))),
@@ -934,7 +934,7 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
   void Clear() {
     nknown_states_ = 0;
     min_unexpanded_state_id_ = 0;
-    max_expanded_state_id_ = -1;
+    max_expanded_state_id_ = kNoStateId;
     has_start_ = false;
     cache_start_ = kNoStateId;
     cache_store_->Clear();
@@ -1010,7 +1010,8 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
 
   // Finds the mininum never-expanded state ID.
   StateId MinUnexpandedState() const {
-    while (min_unexpanded_state_id_ <= max_expanded_state_id_ &&
+    while (max_expanded_state_id_ != kNoStateId &&
+	   min_unexpanded_state_id_ <= max_expanded_state_id_ &&
            ExpandedState(min_unexpanded_state_id_)) {
       ++min_unexpanded_state_id_;
     }
@@ -1021,7 +1022,14 @@ class CacheBaseImpl : public FstImpl<typename State::Arc> {
   StateId MaxExpandedState() const { return max_expanded_state_id_; }
 
   void SetExpandedState(StateId s) {
-    if (s > max_expanded_state_id_) max_expanded_state_id_ = s;
+    //PTZ191111 (at the st. Martinus, I handled special case max_expanded_state_id_ == kNoStateId == (-1)
+    // we do not hope for s == kNoStateId, it is a forbiden index.
+    //
+    if (s == kNoStateId) return;
+    if (max_expanded_state_id_ == kNoStateId
+	|| s > max_expanded_state_id_) {
+      max_expanded_state_id_ = s;
+    }
     if (s < min_unexpanded_state_id_) return;
     if (s == min_unexpanded_state_id_) ++min_unexpanded_state_id_;
     if (cache_gc_ || cache_limit_ == 0) {
@@ -1111,17 +1119,25 @@ class CacheStateIterator : public StateIteratorBase<typename FST::Arc> {
   }
 
   bool Done() const final {
-    if (s_ < impl_->NumKnownStates()) return false;
-    for (StateId u = impl_->MinUnexpandedState(); u < impl_->NumKnownStates();
-         u = impl_->MinUnexpandedState()) {
-      // Forces state expansion.
-      ArcIterator<FST> aiter(fst_, u);
-      aiter.SetFlags(kArcValueFlags, kArcValueFlags | kArcNoCache);
-      for (; !aiter.Done(); aiter.Next()) {
-        impl_->UpdateNumKnownStates(aiter.Value().nextstate);
-      }
-      impl_->SetExpandedState(u);
+    //PTZ191111 (at the st. Martinus, I handled special case s_ == kNoStateId == (-1)
+    // we do not hope for s_ == kNoStateId, it is a forbiden index.
+    if (s_ != kNoStateId) {
       if (s_ < impl_->NumKnownStates()) return false;
+      for (StateId u = impl_->MinUnexpandedState(); u < impl_->NumKnownStates();
+	   u = impl_->MinUnexpandedState()) {
+	// Forces state expansion.
+	ArcIterator<FST> aiter(fst_, u);
+	aiter.SetFlags(kArcValueFlags, kArcValueFlags | kArcNoCache);
+	for (; !aiter.Done(); aiter.Next()) {
+	  impl_->UpdateNumKnownStates(aiter.Value().nextstate);
+	}
+	impl_->SetExpandedState(u);
+	if (s_ < impl_->NumKnownStates()) return false;
+      }
+    } else {
+      VLOG(2) << "CacheStateIterator::Done reached kNoStateId:"	
+	      << "nknown_states_ = " << impl_->NumKnownStates()
+	      << "\n";
     }
     return true;
   }

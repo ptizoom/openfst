@@ -66,8 +66,8 @@ void RandFst(const int num_random_states, const int num_random_arcs,
   StateId nf = rand() % (ns + 1);
   for (StateId n = 0; n < nf; ++n) {
     StateId s = rand() % ns;
-    Weight final = (*weight_generator)();
-    fst->SetFinal(s, final);
+    Weight _final = (*weight_generator)();
+    fst->SetFinal(s, _final);
   }
   VLOG(1) << "Check FST for sanity (including property bits).";
   CHECK(Verify(*fst));
