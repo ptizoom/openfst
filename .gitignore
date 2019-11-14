@@ -7,6 +7,8 @@
 \#*\#
 *.orig
 *in~*
+*sh~*
+*m4~*
 
 Makefile.in
 aclocal.m4

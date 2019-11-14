@@ -180,7 +180,8 @@ class CompactHashBiTable {
   }
 
  private:
-  static_assert(std::is_signed<I>::value, "I must be a signed type");
+  //PTZ191115 static_assert(std::is_signed<I>::value, "I must be a signed type");
+  // actually force it to unsigned, as indexes should be?
   // ... otherwise >= kCurrentKey comparisons as used below don't work.
   // TODO(rybach): (1) remove kEmptyKey, kDeletedKey, (2) don't use >= for key
   // comparison, (3) allow unsigned key types.
@@ -193,7 +194,8 @@ class CompactHashBiTable {
     explicit HashFunc(const CompactHashBiTable &ht) : ht_(&ht) {}
 
     size_t operator()(I k) const {
-      if (k >= kCurrentKey) {
+      ////PTZ191115 U ]-1 .. -3] are forbiden states
+      if ((k + 3) >= (kCurrentKey + 3) && k < kDeletedKey) {
         return (*ht_->hash_func_)(ht_->Key2Entry(k));
       } else {
         return 0;
@@ -211,7 +213,12 @@ class CompactHashBiTable {
     bool operator()(I k1, I k2) const {
       if (k1 == k2) {
         return true;
-      } else if (k1 >= kCurrentKey && k2 >= kCurrentKey) {
+      } else if ( ////PTZ191115 U ]-1 .. -3] are forbiden states
+		 (k1 + 3) >= (kCurrentKey + 3)
+		 && (k2 + 3) >= (kCurrentKey + 3)
+		 && k1 < kDeletedKey
+		 && k2 < kDeletedKey
+		 ) {
         return (*ht_->hash_equal_)(ht_->Key2Entry(k1), ht_->Key2Entry(k2));
       } else {
         return false;
