@@ -8,24 +8,26 @@
 #ifndef FST_EXTENSIONS_NGRAM_NGRAM_FST_H_
 #define FST_EXTENSIONS_NGRAM_NGRAM_FST_H_
 
-#include <stddef.h>
-#include <string.h>
 #include <algorithm>
+#include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include <fst/compat.h>
+#include <fst/types.h>
 #include <fst/log.h>
-#include <fstream>
 #include <fst/extensions/ngram/bitmap-index.h>
+#include <fstream>
 #include <fst/fstlib.h>
 #include <fst/mapped-file.h>
 
 namespace fst {
 template <class A>
 class NGramFst;
+
 template <class A>
 class NGramFstMatcher;
 
@@ -96,9 +98,9 @@ class NGramFstImpl : public FstImpl<A> {
 
   static NGramFstImpl<A> *Read(std::istream &strm,  // NOLINT
                                const FstReadOptions &opts) {
-    NGramFstImpl<A> *impl = new NGramFstImpl();
+    auto impl = fst::make_unique<NGramFstImpl<A>>();
     FstHeader hdr;
-    if (!impl->ReadHeader(strm, opts, kMinFileVersion, &hdr)) return 0;
+    if (!impl->ReadHeader(strm, opts, kMinFileVersion, &hdr)) return nullptr;
     uint64 num_states, num_futures, num_final;
     const size_t offset =
         sizeof(num_states) + sizeof(num_futures) + sizeof(num_final);
@@ -108,7 +110,7 @@ class NGramFstImpl : public FstImpl<A> {
     strm.read(reinterpret_cast<char *>(&num_final), sizeof(num_final));
     size_t size = Storage(num_states, num_futures, num_final);
     MappedFile *data_region = MappedFile::Allocate(size);
-    char *data = reinterpret_cast<char *>(data_region->mutable_data());
+    char *data = static_cast<char *>(data_region->mutable_data());
     // Copy num_states, num_futures and num_final back into data.
     memcpy(data, reinterpret_cast<char *>(&num_states), sizeof(num_states));
     memcpy(data + sizeof(num_states), reinterpret_cast<char *>(&num_futures),
@@ -116,12 +118,9 @@ class NGramFstImpl : public FstImpl<A> {
     memcpy(data + sizeof(num_states) + sizeof(num_futures),
            reinterpret_cast<char *>(&num_final), sizeof(num_final));
     strm.read(data + offset, size - offset);
-    if (strm.fail()) {
-      delete impl;
-      return nullptr;
-    }
+    if (strm.fail()) return nullptr;
     impl->Init(data, false, data_region);
-    return impl;
+    return impl.release();
   }
 
   bool Write(std::ostream &strm,  // NOLINT
@@ -167,7 +166,7 @@ class NGramFstImpl : public FstImpl<A> {
   StateId NumStates() const { return num_states_; }
 
   void InitStateIterator(StateIteratorData<A> *data) const {
-    data->base = 0;
+    data->base = nullptr;
     data->nstates = num_states_;
   }
 
@@ -382,15 +381,15 @@ class NGramFst : public ImplToExpandedFst<internal::NGramFstImpl<A>> {
     return impl ? new NGramFst<A>(std::shared_ptr<Impl>(impl)) : nullptr;
   }
 
-  static NGramFst<A> *Read(const string &filename) {
-    if (!filename.empty()) {
-      std::ifstream strm(filename,
+  static NGramFst<A> *Read(const std::string &source) {
+    if (!source.empty()) {
+      std::ifstream strm(source,
                               std::ios_base::in | std::ios_base::binary);
       if (!strm.good()) {
-        LOG(ERROR) << "NGramFst::Read: Can't open file: " << filename;
+        LOG(ERROR) << "NGramFst::Read: Can't open file: " << source;
         return nullptr;
       }
-      return Read(strm, FstReadOptions(filename));
+      return Read(strm, FstReadOptions(source));
     } else {
       return Read(std::cin, FstReadOptions("standard input"));
     }
@@ -400,8 +399,8 @@ class NGramFst : public ImplToExpandedFst<internal::NGramFstImpl<A>> {
     return GetImpl()->Write(strm, opts);
   }
 
-  bool Write(const string &filename) const override {
-    return Fst<A>::WriteFile(filename);
+  bool Write(const std::string &source) const override {
+    return Fst<A>::WriteFile(source);
   }
 
   inline void InitStateIterator(StateIteratorData<A> *data) const override {
@@ -490,12 +489,12 @@ NGramFstImpl<A>::NGramFstImpl(const Fst<A> &fst,
   }
 
   int64 num_states = CountStates(fst);
-  Label *context = new Label[num_states];
+  std::vector<Label> context(num_states, 0);
 
   // Find the unigram state by starting from the start state, following
   // epsilons.
   StateId unigram = fst.Start();
-  while (1) {
+  while (true) {
     if (unigram == kNoStateId) {
       FSTERROR() << "Could not identify unigram state";
       SetProperties(kError, kError);
@@ -593,14 +592,12 @@ NGramFstImpl<A>::NGramFstImpl(const Fst<A> &fst,
     ArcSort(&context_fst, ILabelCompare<Arc>());
   }
 
-  delete[] context;
-
   uint64 b64;
   Weight weight;
   Label label = kNoLabel;
   const size_t storage = Storage(num_states, num_futures, num_final);
   MappedFile *data_region = MappedFile::Allocate(storage);
-  char *data = reinterpret_cast<char *>(data_region->mutable_data());
+  char *data = static_cast<char *>(data_region->mutable_data());
   memset(data, 0, storage);
   size_t offset = 0;
   memcpy(data + offset, reinterpret_cast<char *>(&num_states),
@@ -1006,21 +1003,21 @@ class ArcIterator<NGramFst<A>> : public ArcIteratorBase<A> {
     }
   }
 
-  uint32 Flags() const final { return flags_; }
+  uint8 Flags() const final { return flags_; }
 
-  void SetFlags(uint32 flags, uint32 mask) final {
+  void SetFlags(uint8 flags, uint8 mask) final {
     flags_ &= ~mask;
     flags_ |= (flags & kArcValueFlags);
   }
 
  private:
   mutable Arc arc_;
-  mutable uint32 lazy_;
+  mutable uint8 lazy_;
   const internal::NGramFstImpl<A> *impl_;  // Borrowed reference.
   mutable NGramFstInst<A> inst_;
 
   size_t i_;
-  uint32 flags_;
+  uint8 flags_;
 };
 
 }  // namespace fst

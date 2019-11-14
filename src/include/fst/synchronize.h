@@ -10,8 +10,9 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <utility>
 #include <vector>
+
+#include <fst/types.h>
 
 #include <fst/cache.h>
 #include <fst/test-properties.h>
@@ -46,7 +47,7 @@ class SynchronizeFstImpl : public CacheImpl<Arc> {
   using CacheBaseImpl<CacheState<Arc>>::SetFinal;
   using CacheBaseImpl<CacheState<Arc>>::SetStart;
 
-  using String = basic_string<Label>;
+  using String = std::basic_string<Label>;
 
   struct Element {
     Element() {}
@@ -189,8 +190,7 @@ class SynchronizeFstImpl : public CacheImpl<Arc> {
   // Finds state corresponding to an element. Creates new state if element
   // is not found.
   StateId FindState(const Element &element) {
-    const auto insert_result =
-        element_map_.insert(std::make_pair(element, elements_.size()));
+    const auto insert_result = element_map_.emplace(element, elements_.size());
     if (insert_result.second) {
       elements_.push_back(element);
     }
@@ -335,12 +335,12 @@ class SynchronizeFst : public ImplToFst<internal::SynchronizeFstImpl<A>> {
       : ImplToFst<Impl>(std::make_shared<Impl>(fst, opts)) {}
 
   // See Fst<>::Copy() for doc.
-  SynchronizeFst(const SynchronizeFst<Arc> &fst, bool safe = false)
+  SynchronizeFst(const SynchronizeFst &fst, bool safe = false)
       : ImplToFst<Impl>(fst, safe) {}
 
   // Gets a copy of this SynchronizeFst. See Fst<>::Copy() for further doc.
-  SynchronizeFst<Arc> *Copy(bool safe = false) const override {
-    return new SynchronizeFst<Arc>(*this, safe);
+  SynchronizeFst *Copy(bool safe = false) const override {
+    return new SynchronizeFst(*this, safe);
   }
 
   inline void InitStateIterator(StateIteratorData<Arc> *data) const override;

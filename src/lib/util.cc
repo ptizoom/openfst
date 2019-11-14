@@ -4,10 +4,13 @@
 // FST utility definitions.
 
 #include <fst/util.h>
+
 #include <cctype>
 #include <sstream>
 #include <string>
+
 #include <fst/flags.h>
+#include <fst/types.h>
 #include <fst/log.h>
 #include <fst/mapped-file.h>
 
@@ -31,7 +34,7 @@ void SplitString(char *full, const char *delim, std::vector<char *> *vec,
   }
 }
 
-int64 StrToInt64(const string &s, const string &src, size_t nline,
+int64 StrToInt64(const std::string &s, const std::string &source, size_t nline,
                  bool allow_negative, bool *error) {
   int64 n;
   const char *cs = s.c_str();
@@ -39,7 +42,7 @@ int64 StrToInt64(const string &s, const string &src, size_t nline,
   if (error) *error = false;
   n = strtoll(cs, &p, 10);
   if (p < cs + s.size() || (!allow_negative && n < 0)) {
-    FSTERROR() << "StrToInt64: Bad integer = " << s << "\", source = " << src
+    FSTERROR() << "StrToInt64: Bad integer = " << s << "\", source = " << source
                << ", line = " << nline;
     if (error) *error = true;
     return 0;
@@ -47,7 +50,7 @@ int64 StrToInt64(const string &s, const string &src, size_t nline,
   return n;
 }
 
-void ConvertToLegalCSymbol(string *s) {
+void ConvertToLegalCSymbol(std::string *s) {
   for (auto it = s->begin(); it != s->end(); ++it) {
     if (!isalnum(*it)) {
       *it = '_';

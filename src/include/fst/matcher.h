@@ -11,6 +11,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include <fst/types.h>
 #include <fst/log.h>
 
 #include <fst/mutable-fst.h>  // for all internal FST accessors.
@@ -51,14 +52,15 @@ namespace fst {
 //
 //   // If safe = true, the copy is thread-safe. See Fst<>::Copy() for
 //   // further doc.
-//   Matcher<FST> *Copy(bool safe = false) const override;
+//   Matcher *Copy(bool safe = false) const override;
 //
 //   // Returns the match type that can be provided (depending on compatibility
-//   of the input FST). It is either the requested match type, MATCH_NONE, or
-//   MATCH_UNKNOWN. If test is false, a costly testing is avoided, but
-//   MATCH_UNKNOWN may be returned. If test is true, a definite answer is
-//   returned, but may involve more costly computation (e.g., visiting the FST).
-//   MatchType Type(bool test) const override;
+//   // of the input FST). It is either the requested match type, MATCH_NONE,
+//   // or MATCH_UNKNOWN. If test is false, a costly testing is avoided, but
+//   // MATCH_UNKNOWN may be returned. If test is true, a definite answer is
+//   // returned, but may involve more costly computation (e.g., visiting
+//   // the FST).
+//   // MatchType Type(bool test) const override;
 //
 //   // Specifies the current state.
 //   void SetState(StateId s) final;
@@ -69,7 +71,7 @@ namespace fst {
 //   bool Find(Label label) final;
 //
 //   // Iterator methods. Note that initially and after SetState() these have
-//   undefined behavior until Find() is called.
+//   // undefined behavior until Find() is called.
 //
 //   bool Done() const final;
 //
@@ -123,7 +125,7 @@ class MatcherBase {
 
   // Virtual interface.
 
-  virtual MatcherBase<Arc> *Copy(bool safe = false) const = 0;
+  virtual MatcherBase *Copy(bool safe = false) const = 0;
   virtual MatchType Type(bool) const = 0;
   virtual void SetState(StateId) = 0;
   virtual bool Find(Label) = 0;
@@ -196,7 +198,7 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
   }
 
   // This makes a copy of the FST.
-  SortedMatcher(const SortedMatcher<FST> &matcher, bool safe = false)
+  SortedMatcher(const SortedMatcher &matcher, bool safe = false)
       : owned_fst_(matcher.fst_.Copy(safe)),
         fst_(*owned_fst_),
         state_(kNoStateId),
@@ -211,8 +213,8 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
 
   ~SortedMatcher() override { Destroy(aiter_, &aiter_pool_); }
 
-  SortedMatcher<FST> *Copy(bool safe = false) const override {
-    return new SortedMatcher<FST>(*this, safe);
+  SortedMatcher *Copy(bool safe = false) const override {
+    return new SortedMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const override {
@@ -444,7 +446,7 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
   }
 
   // This makes a copy of the FST.
-  HashMatcher(const HashMatcher<FST> &matcher, bool safe = false)
+  HashMatcher(const HashMatcher &matcher, bool safe = false)
       : owned_fst_(matcher.fst_.Copy(safe)),
         fst_(*owned_fst_),
         state_(kNoStateId),
@@ -454,8 +456,8 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
         state_table_(
             safe ? std::make_shared<StateTable>() : matcher.state_table_) {}
 
-  HashMatcher<FST> *Copy(bool safe = false) const override {
-    return new HashMatcher<FST>(*this, safe);
+  HashMatcher *Copy(bool safe = false) const override {
+    return new HashMatcher(*this, safe);
   }
 
   // The argument is ignored as there are no relevant properties to test.
@@ -630,7 +632,7 @@ class PhiMatcher : public MatcherBase<typename M::Arc> {
 
 
   // This makes a copy of the FST.
-  PhiMatcher(const PhiMatcher<M> &matcher, bool safe = false)
+  PhiMatcher(const PhiMatcher &matcher, bool safe = false)
       : matcher_(new M(*matcher.matcher_, safe)),
         match_type_(matcher.match_type_),
         phi_label_(matcher.phi_label_),
@@ -639,8 +641,8 @@ class PhiMatcher : public MatcherBase<typename M::Arc> {
         phi_loop_(matcher.phi_loop_),
         error_(matcher.error_) {}
 
-  PhiMatcher<M> *Copy(bool safe = false) const override {
-    return new PhiMatcher<M>(*this, safe);
+  PhiMatcher *Copy(bool safe = false) const override {
+    return new PhiMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const override { return matcher_->Type(test); }
@@ -892,7 +894,7 @@ class RhoMatcher : public MatcherBase<typename M::Arc> {
                    matcher ? matcher : new M(fst, match_type)) { }
 
   // This makes a copy of the FST.
-  RhoMatcher(const RhoMatcher<M> &matcher, bool safe = false)
+  RhoMatcher(const RhoMatcher &matcher, bool safe = false)
       : matcher_(new M(*matcher.matcher_, safe)),
         match_type_(matcher.match_type_),
         rho_label_(matcher.rho_label_),
@@ -901,8 +903,8 @@ class RhoMatcher : public MatcherBase<typename M::Arc> {
         state_(kNoStateId),
         has_rho_(false) {}
 
-  RhoMatcher<M> *Copy(bool safe = false) const override {
-    return new RhoMatcher<M>(*this, safe);
+  RhoMatcher *Copy(bool safe = false) const override {
+    return new RhoMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const override { return matcher_->Type(test); }
@@ -1084,7 +1086,7 @@ class SigmaMatcher : public MatcherBase<typename M::Arc> {
                      matcher ? matcher : new M(fst, match_type)) { }
 
   // This makes a copy of the FST.
-  SigmaMatcher(const SigmaMatcher<M> &matcher, bool safe = false)
+  SigmaMatcher(const SigmaMatcher &matcher, bool safe = false)
       : matcher_(new M(*matcher.matcher_, safe)),
         match_type_(matcher.match_type_),
         sigma_label_(matcher.sigma_label_),
@@ -1092,8 +1094,8 @@ class SigmaMatcher : public MatcherBase<typename M::Arc> {
         error_(matcher.error_),
         state_(kNoStateId) {}
 
-  SigmaMatcher<M> *Copy(bool safe = false) const override {
-    return new SigmaMatcher<M>(*this, safe);
+  SigmaMatcher *Copy(bool safe = false) const override {
+    return new SigmaMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const override { return matcher_->Type(test); }
@@ -1263,7 +1265,7 @@ class MultiEpsMatcher {
   }
 
   // This makes a copy of the FST.
-  MultiEpsMatcher(const MultiEpsMatcher<M> &matcher, bool safe = false)
+  MultiEpsMatcher(const MultiEpsMatcher &matcher, bool safe = false)
       : matcher_(new M(*matcher.matcher_, safe)),
         flags_(matcher.flags_),
         own_matcher_(true),
@@ -1276,8 +1278,8 @@ class MultiEpsMatcher {
     if (own_matcher_) delete matcher_;
   }
 
-  MultiEpsMatcher<M> *Copy(bool safe = false) const {
-    return new MultiEpsMatcher<M>(*this, safe);
+  MultiEpsMatcher *Copy(bool safe = false) const {
+    return new MultiEpsMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const { return matcher_->Type(test); }
@@ -1437,13 +1439,13 @@ class ExplicitMatcher : public MatcherBase<typename M::Arc> {
         error_(false) {}
 
   // This makes a copy of the FST.
-  ExplicitMatcher(const ExplicitMatcher<M> &matcher, bool safe = false)
+  ExplicitMatcher(const ExplicitMatcher &matcher, bool safe = false)
       : matcher_(new M(*matcher.matcher_, safe)),
         match_type_(matcher.match_type_),
         error_(matcher.error_) {}
 
-  ExplicitMatcher<M> *Copy(bool safe = false) const override {
-    return new ExplicitMatcher<M>(*this, safe);
+  ExplicitMatcher *Copy(bool safe = false) const override {
+    return new ExplicitMatcher(*this, safe);
   }
 
   MatchType Type(bool test) const override { return matcher_->Type(test); }
@@ -1530,15 +1532,15 @@ class Matcher {
   }
 
   // This makes a copy of the FST.
-  Matcher(const Matcher<FST> &matcher, bool safe = false)
+  Matcher(const Matcher &matcher, bool safe = false)
       : base_(matcher.base_->Copy(safe)) { }
 
   // Takes ownership of the provided matcher.
   explicit Matcher(MatcherBase<Arc> *base_matcher)
       : base_(base_matcher) { }
 
-  Matcher<FST> *Copy(bool safe = false) const {
-    return new Matcher<FST>(*this, safe);
+  Matcher *Copy(bool safe = false) const {
+    return new Matcher(*this, safe);
   }
 
   MatchType Type(bool test) const { return base_->Type(test); }

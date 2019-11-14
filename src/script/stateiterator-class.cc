@@ -1,8 +1,9 @@
 // See www.openfst.org for extensive documentation on this weighted
 // finite-state transducer library.
 
-#include <fst/script/script-impl.h>
 #include <fst/script/stateiterator-class.h>
+
+#include <fst/script/script-impl.h>
 
 namespace fst {
 namespace script {
@@ -13,12 +14,8 @@ StateIteratorClass::StateIteratorClass(const FstClass &fst) : impl_(nullptr) {
                                                fst.ArcType(), &args);
 }
 
-REGISTER_FST_OPERATION(InitStateIteratorClass, StdArc,
-                       InitStateIteratorClassArgs);
-REGISTER_FST_OPERATION(InitStateIteratorClass, LogArc,
-                       InitStateIteratorClassArgs);
-REGISTER_FST_OPERATION(InitStateIteratorClass, Log64Arc,
-                       InitStateIteratorClassArgs);
+REGISTER_FST_OPERATION_3ARCS(InitStateIteratorClass,
+                             InitStateIteratorClassArgs);
 
 }  // namespace script
 }  // namespace fst

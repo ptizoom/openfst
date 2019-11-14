@@ -8,12 +8,13 @@
 #ifndef FST_SET_WEIGHT_H_
 #define FST_SET_WEIGHT_H_
 
-#include <cstdlib>
-
 #include <algorithm>
+#include <cstdlib>
 #include <list>
 #include <string>
 #include <vector>
+
+#include <fst/types.h>
 
 #include <fst/union-weight.h>
 #include <fst/weight.h>
@@ -58,7 +59,7 @@ class SetWeight {
 
   // Input should be positive, sorted and unique.
   template <typename Iterator>
-  SetWeight(const Iterator &begin, const Iterator &end) {
+  SetWeight(const Iterator begin, const Iterator end) {
     for (auto iter = begin; iter != end; ++iter) PushBack(*iter);
   }
 
@@ -102,15 +103,15 @@ class SetWeight {
     return *no_weight;
   }
 
-  static const string &Type() {
-    static const string *const type = new string(
-        S == SET_UNION_INTERSECT
-        ? "union_intersect_set"
-        : (S == SET_INTERSECT_UNION
-           ? "intersect_union_set"
-           : (S == SET_INTERSECT_UNION_RESTRICT
-              ? "restricted_set_intersect_union"
-              : "boolean_set")));
+  static const std::string &Type() {
+    static const std::string *const type =
+        new std::string(S == SET_UNION_INTERSECT
+                            ? "union_intersect_set"
+                            : (S == SET_INTERSECT_UNION
+                                   ? "intersect_union_set"
+                                   : (S == SET_INTERSECT_UNION_RESTRICT
+                                          ? "restricted_set_intersect_union"
+                                          : "boolean_set")));
     return *type;
   }
 
@@ -339,7 +340,7 @@ inline std::ostream &operator<<(std::ostream &strm,
 template <typename Label, SetType S>
 inline std::istream &operator>>(std::istream &strm,
                                 SetWeight<Label, S> &weight) {
-  string str;
+  std::string str;
   strm >> str;
   using Weight = SetWeight<Label, S>;
   if (str == "EmptySet") {

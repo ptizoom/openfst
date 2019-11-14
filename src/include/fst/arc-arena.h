@@ -1,9 +1,16 @@
+// See www.openfst.org for extensive documentation on this weighted
+// finite-state transducer library.
+//
+// Allocators for contiguous arrays of arcs.
+
 #ifndef FST_ARC_ARENA_H_
 #define FST_ARC_ARENA_H_
 
 #include <deque>
 #include <memory>
 #include <utility>
+
+#include <fst/types.h>
 #include <fst/fst.h>
 #include <fst/memory.h>
 #include <unordered_map>
@@ -139,7 +146,7 @@ class ArcArenaStateStore {
 
   class State {
    public:
-    Weight Final() const { return final_; }
+    Weight Final() const { return final_weight_; }
 
     size_t NumInputEpsilons() const { return niepsilons_; }
 
@@ -154,15 +161,15 @@ class ArcArenaStateStore {
     int* MutableRefCount() const { return nullptr; }
 
    private:
-    State(Weight weight, int32 niepsilons, int32 noepsilons, int32 narcs,
+    State(Weight final_weight, int32 niepsilons, int32 noepsilons, int32 narcs,
           const Arc *arcs)
-        : final_(std::move(weight)),
+        : final_weight_(std::move(final_weight)),
           niepsilons_(niepsilons),
           noepsilons_(noepsilons),
           narcs_(narcs),
           arcs_(arcs) {}
 
-    Weight final_;
+    Weight final_weight_;
     size_t niepsilons_;
     size_t noepsilons_;
     size_t narcs_;
@@ -187,7 +194,7 @@ class ArcArenaStateStore {
       if (arcs[i].olabel == 0) ++noepsilons;
     }
     states_.emplace_back(
-        State(builder.final_, niepsilons, noepsilons, narcs, arcs));
+        State(builder.final_weight_, niepsilons, noepsilons, narcs, arcs));
     // Places it in the cache.
     auto state = &states_.back();
     it.first->second = state;
@@ -202,10 +209,10 @@ class ArcArenaStateStore {
  private:
   class StateBuilder {
    public:
-    explicit StateBuilder(ArcArena<Arc>* arena)
-       : arena_(arena), final_(Weight::Zero()), narcs_(0) {}
+    explicit StateBuilder(ArcArena<Arc> *arena)
+        : arena_(arena), final_weight_(Weight::Zero()), narcs_(0) {}
 
-    void SetFinal(Weight weight) { final_ = std::move(weight); }
+    void SetFinal(Weight weight) { final_weight_ = std::move(weight); }
 
     void ReserveArcs(size_t n) { arena_->ReserveArcs(n); }
 
@@ -218,7 +225,7 @@ class ArcArenaStateStore {
     friend class ArcArenaStateStore<Arc>;
 
     ArcArena<Arc> *arena_;
-    Weight final_;
+    Weight final_weight_;
     size_t narcs_;
   };
 

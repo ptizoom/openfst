@@ -1,12 +1,13 @@
 AM_CPPFLAGS = -I$(srcdir)/../include $(ICU_CPPFLAGS)
 
 lib_LTLIBRARIES = libopenfst.la
-libopenfst_la_SOURCES = compat.cc flags.cc fst.cc fst-types.cc mapped-file.cc \
-                    properties.cc symbol-table.cc symbol-table-ops.cc \
-                    weight.cc util.cc
+libopenfst_la_SOURCES = compat.cc encode.cc flags.cc fst.cc fst-types.cc \
+                    mapped-file.cc properties.cc symbol-table.cc \
+                    symbol-table-ops.cc weight.cc util.cc
 libopenfst_la_SOURCES +=  $(srcdir)/../include/fst/fst.h
-libopenfst_la_LDFLAGS = -version-info 16:0:0
+libopenfst_la_LDFLAGS = -version-info 17:0:0
 libopenfst_la_LIBADD = $(DL_LIBS)
+
 #if HAVE_SCRIPT
 #libopenfst_la_LIBADD += $(builddir)/../script/libfstscript.la
 #libopenfst_la_DEPENDENCIES = $(builddir)/../script/libfstscript.la

@@ -5,8 +5,8 @@
 #pragma GCC optimize ("Og")
 #endif
 
-#include <fst/script/fst-class.h>
 #include <fst/script/disambiguate.h>
+
 #include <fst/script/script-impl.h>
 
 namespace fst {
@@ -23,9 +23,7 @@ void Disambiguate(const FstClass &ifst, MutableFstClass *ofst,
   Apply<Operation<DisambiguateArgs>>("Disambiguate", ifst.ArcType(), &args);
 }
 
-REGISTER_FST_OPERATION(Disambiguate, StdArc, DisambiguateArgs);
-REGISTER_FST_OPERATION(Disambiguate, LogArc, DisambiguateArgs);
-REGISTER_FST_OPERATION(Disambiguate, Log64Arc, DisambiguateArgs);
+REGISTER_FST_OPERATION_3ARCS(Disambiguate, DisambiguateArgs);
 
 }  // namespace script
 }  // namespace fst

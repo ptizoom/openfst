@@ -13,9 +13,8 @@
 #include <vector>
 
 #include <fst/compat.h>
-#include <fst/fst.h>
-
 #include <fst/extensions/linear/trie.h>
+#include <fst/fst.h>
 
 namespace fst {
 
@@ -329,7 +328,7 @@ class FeatureGroup {
 
   size_t Delay() const { return delay_; }
 
-  string Stats() const;
+  std::string Stats() const;
 
  private:
   // Label along the arcs on the trie. `kNoLabel` means anything
@@ -392,7 +391,7 @@ template <class A>
 struct FeatureGroup<A>::InputOutputLabel {
   Label input, output;
 
-  InputOutputLabel(Label i = kNoLabel, Label o = kNoLabel)
+  explicit InputOutputLabel(Label i = kNoLabel, Label o = kNoLabel)
       : input(i), output(o) {}
 
   bool operator==(InputOutputLabel that) const {
@@ -463,7 +462,7 @@ inline int FeatureGroup<A>::FindFirstMatch(InputOutputLabel label,
 }
 
 template <class A>
-inline string FeatureGroup<A>::Stats() const {
+inline std::string FeatureGroup<A>::Stats() const {
   std::ostringstream strm;
   int num_states = 2;
   for (int i = 2; i < next_state_.size(); ++i)

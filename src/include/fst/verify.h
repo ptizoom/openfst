@@ -6,6 +6,7 @@
 #ifndef FST_VERIFY_H_
 #define FST_VERIFY_H_
 
+#include <fst/types.h>
 #include <fst/log.h>
 
 #include <fst/fst.h>
@@ -17,16 +18,10 @@ namespace fst {
 // Verifies that an Fst's contents are sane.
 template <class Arc>
 bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
-  using StateId = typename Arc::StateId;
   const auto start = fst.Start();
   const auto *isyms = fst.InputSymbols();
   const auto *osyms = fst.OutputSymbols();
-  // Count states
-  StateId ns = 0;
-  for (StateIterator<Fst<Arc>> siter(fst)
-	 ; !siter.Done()
-	   && ns != kNoStateId
-	 ; siter.Next()) ++ns;
+  const auto ns = CountStates(fst);
   if (ns == kNoStateId) {
     LOG(ERROR) << "Verify: reached kNoStateId ; FST has too many state ID";
     return false;
@@ -46,7 +41,7 @@ bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
         LOG(ERROR) << "Verify: FST input label ID of arc at position " << na
                    << " of state " << state << " is negative";
         return false;
-      } else if (isyms && isyms->Find(arc.ilabel).empty()) {
+      } else if (isyms && !isyms->Member(arc.ilabel)) {
         LOG(ERROR) << "Verify: FST input label ID " << arc.ilabel
                    << " of arc at position " << na << " of state " << state
                    << " is missing from input symbol table \"" << isyms->Name()
@@ -56,7 +51,7 @@ bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
         LOG(ERROR) << "Verify: FST output label ID of arc at position " << na
                    << " of state " << state << " is negative";
         return false;
-      } else if (osyms && osyms->Find(arc.olabel).empty()) {
+      } else if (osyms && !osyms->Member(arc.olabel)) {
         LOG(ERROR) << "Verify: FST output label ID " << arc.olabel
                    << " of arc at position " << na << " of state " << state
                    << " is missing from output symbol table \"" << osyms->Name()

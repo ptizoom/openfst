@@ -6,12 +6,14 @@
 #ifndef FST_QUEUE_H_
 #define FST_QUEUE_H_
 
-#include <deque>
 #include <memory>
+#include <queue>
+#include <stack>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
+#include <fst/types.h>
 #include <fst/log.h>
 
 #include <fst/arcfilter.h>
@@ -138,20 +140,20 @@ class FifoQueue : public QueueBase<S> {
 
   virtual ~FifoQueue() = default;
 
-  StateId Head() const override { return queue_.back(); }
+  StateId Head() const override { return queue_.front(); }
 
-  void Enqueue(StateId s) override { queue_.push_front(s); }
+  void Enqueue(StateId s) override { queue_.push(s); }
 
-  void Dequeue() override { queue_.pop_back(); }
+  void Dequeue() override { queue_.pop(); }
 
   void Update(StateId) override {}
 
   bool Empty() const override { return queue_.empty(); }
 
-  void Clear() override { queue_.clear(); }
+  void Clear() override { queue_ = std::queue<StateId>(); }
 
  private:
-  std::deque<StateId> queue_;
+  std::queue<StateId> queue_;
 };
 
 // Last-in, first-out queue discipline.
@@ -164,20 +166,20 @@ class LifoQueue : public QueueBase<S> {
 
   virtual ~LifoQueue() = default;
 
-  StateId Head() const final { return queue_.front(); }
+  StateId Head() const final { return stack_.top(); }
 
-  void Enqueue(StateId s) final { queue_.push_front(s); }
+  void Enqueue(StateId s) final { stack_.push(s); }
 
-  void Dequeue() final { queue_.pop_front(); }
+  void Dequeue() final { stack_.pop(); }
 
   void Update(StateId) final {}
 
-  bool Empty() const final { return queue_.empty(); }
+  bool Empty() const final { return stack_.empty(); }
 
-  void Clear() final { queue_.clear(); }
+  void Clear() final { stack_ = std::stack<StateId>(); }
 
  private:
-  std::deque<StateId> queue_;
+  std::stack<StateId> stack_;
 };
 
 // Shortest-first queue discipline, templated on the StateId and as well as a
@@ -230,6 +232,8 @@ class ShortestFirstQueue : public QueueBase<S> {
     heap_.Clear();
     if (update) key_.clear();
   }
+
+  ssize_t Size() const { return heap_.Size(); }
 
   const Compare &GetCompare() const { return heap_.GetCompare(); }
 
@@ -312,10 +316,11 @@ class PruneNaturalShortestFirstQueue
   using StateId = S;
   using Base = NaturalShortestFirstQueue<StateId, Weight>;
 
-  explicit PruneNaturalShortestFirstQueue(const std::vector<Weight> &distance,
-                                          int threshold)
+  PruneNaturalShortestFirstQueue(const std::vector<Weight> &distance,
+                                 ssize_t arc_threshold, ssize_t state_limit = 0)
       : Base(distance),
-        threshold_(threshold),
+        arc_threshold_(arc_threshold),
+        state_limit_(state_limit),
         head_steps_(0),
         max_head_steps_(0) {}
 
@@ -341,7 +346,22 @@ class PruneNaturalShortestFirstQueue
     }
     // This is the number of arcs in the minimum cost path from Start to s.
     steps_[s] = state_steps;
-    if (state_steps > (max_head_steps_ - threshold_) || threshold_ < 0) {
+
+    // Adjust the threshold in cases where path step thresholding wasn't
+    // enough to keep the queue small.
+    ssize_t adjusted_threshold = arc_threshold_;
+    if (Base::Size() > state_limit_ && state_limit_ > 0) {
+      adjusted_threshold = std::max<ssize_t>(
+          0, arc_threshold_ - (Base::Size() / state_limit_) - 1);
+    }
+
+    if (state_steps > (max_head_steps_ - adjusted_threshold) ||
+        arc_threshold_ < 0) {
+      if (adjusted_threshold == 0 && state_limit_ > 0) {
+        // If the queue is continuing to grow without bound, we follow any
+        // path that makes progress and clear the rest.
+        Base::Clear();
+      }
       Base::Enqueue(s);
     }
   }
@@ -352,7 +372,10 @@ class PruneNaturalShortestFirstQueue
   std::vector<ssize_t> steps_;
   // We only keep paths that are within this number of arcs (not weight!)
   // of the longest path.
-  const ssize_t threshold_;
+  const ssize_t arc_threshold_;
+  // If the size of the queue climbs above this number, we increase the
+  // threshold to reduce the amount of work we have to do.
+  const ssize_t state_limit_;
 
   // The following are mutable because Head() is const.
   // The number of arcs traversed in the minimum cost path from the start

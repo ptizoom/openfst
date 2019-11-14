@@ -16,7 +16,7 @@ shortest-distance.cc shortest-path.cc stateiterator-class.cc synchronize.cc \
 text-io.cc topsort.cc union.cc weight-class.cc verify.cc
 
 #libfstscript_la_LIBADD = $(builddir)/../lib/libopenfst.la -lm $(DL_LIBS)
-libfstscript_la_LDFLAGS = -version-info 16:0:0
+libfstscript_la_LDFLAGS = -version-info 18:0:0
 #libfstscript_la_DEPENDENCIES = $(builddir)/../lib/libopenfst.la
 #$(libfstscript_la_DEPENDENCIES):;echo $(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
 #endif
