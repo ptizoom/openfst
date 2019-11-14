@@ -61,7 +61,7 @@ struct CompactFstOptions : public CacheOptions {
 //     StateId GetStateId() const;
 //     Weight Final() const;
 //     size_t NumArcs() const;
-//     Arc GetArc(size_t i) const;
+//     Arc GetArc(size_t i, uint32 f) const;
 //   };
 //
 //   // Modifies 'state' accessor to provide access to state id 's'.
@@ -253,9 +253,7 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
   for (StateIterator<Fst<Arc>> siter(fst); !siter.Done(); siter.Next()) {
     ++nstates_;
     const auto s = siter.Value();
-    for (ArcIterator<Fst<Arc>> aiter(fst, s); !aiter.Done(); aiter.Next()) {
-      ++narcs_;
-    }
+    narcs_ += fst.NumArcs(s);
     if (fst.Final(s) != Weight::Zero()) ++nfinals;
   }
   if (compactor.Size() == -1) {
@@ -291,7 +289,7 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
     for (ArcIterator<Fst<Arc>> aiter(fst, s); !aiter.Done(); aiter.Next()) {
       compacts_[pos++] = compactor.Compact(s, aiter.Value());
     }
-    if ((compactor.Size() != -1) && ((pos - fpos) != (size_t)compactor.Size())) {
+    if ((compactor.Size() != -1) && (pos != fpos + compactor.Size())) {
       FSTERROR() << "DefaultCompactStore: Compactor incompatible with FST";
       error_ = true;
       return;

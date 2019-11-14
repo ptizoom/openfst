@@ -7,6 +7,7 @@
 #define FST_UNION_H_
 
 #include <algorithm>
+#include <utility>
 #include <vector>
 
 #include <fst/mutable-fst.h>
@@ -29,8 +30,6 @@ namespace fst {
 // FST.
 template <class Arc>
 void Union(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
-  using Label ATTRIBUTE_UNUSED = typename Arc::Label;
-  using StateId ATTRIBUTE_UNUSED = typename Arc::StateId;
   using Weight = typename Arc::Weight;
   // Checks for symbol table compatibility.
   if (!CompatSymbols(fst1->InputSymbols(), fst2.InputSymbols()) ||
@@ -61,7 +60,7 @@ void Union(MutableFst<Arc> *fst1, const Fst<Arc> &fst2) {
     for (ArcIterator<Fst<Arc>> aiter(fst2, s2); !aiter.Done(); aiter.Next()) {
       auto arc = aiter.Value();  // Copy intended.
       arc.nextstate += numstates1;
-      fst1->AddArc(s1, arc);
+      fst1->AddArc(s1, std::move(arc));
     }
   }
   const auto start1 = fst1->Start();

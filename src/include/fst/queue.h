@@ -18,6 +18,7 @@
 #include <fst/connect.h>
 #include <fst/heap.h>
 #include <fst/topsort.h>
+#include <fst/weight.h>
 
 
 namespace fst {
@@ -264,7 +265,7 @@ class StateWeightCompare {
 // Shortest-first queue discipline, templated on the StateId and Weight, is
 // specialized to use the weight's natural order for the comparison function.
 template <typename S, typename Weight>
-class NaturalShortestFirstQueue final
+class NaturalShortestFirstQueue
     : public ShortestFirstQueue<
           S, internal::StateWeightCompare<S, NaturalLess<Weight>>> {
  public:
@@ -278,8 +279,87 @@ class NaturalShortestFirstQueue final
 
  private:
   // This is non-static because the constructor for non-idempotent weights will
-  // result in a an error.
+  // result in an error.
   const NaturalLess<Weight> less_{};
+};
+
+// In a shortest path computation on a lattice-like FST, we may keep many old
+// nonviable paths as a part of the search. Since the search process always
+// expands the lowest cost path next, that lowest cost path may be a very old
+// nonviable path instead of one we expect to lead to a shortest path.
+//
+// For instance, suppose that the current best path in an alignment has
+// traversed 500 arcs with a cost of 10. We may also have a bad path in
+// the queue that has traversed only 40 arcs but also has a cost of 10.
+// This path is very unlikely to lead to a reasonable alignment, so this queue
+// can prune it from the search space.
+//
+// This queue relies on the caller using a shortest-first exploration order
+// like this:
+//   while (true) {
+//     StateId head = queue.Head();
+//     queue.Dequeue();
+//     for (const auto& arc : GetArcs(fst, head)) {
+//       queue.Enqueue(arc.nextstate);
+//     }
+//   }
+// We use this assumption to guess that there is an arc between Head and the
+// Enqueued state; this is how the number of path steps is measured.
+template <typename S, typename Weight>
+class PruneNaturalShortestFirstQueue
+    : public NaturalShortestFirstQueue<S, Weight> {
+ public:
+  using StateId = S;
+  using Base = NaturalShortestFirstQueue<StateId, Weight>;
+
+  explicit PruneNaturalShortestFirstQueue(const std::vector<Weight> &distance,
+                                          int threshold)
+      : Base(distance),
+        threshold_(threshold),
+        head_steps_(0),
+        max_head_steps_(0) {}
+
+  ~PruneNaturalShortestFirstQueue() override = default;
+
+  StateId Head() const override {
+    const auto head = Base::Head();
+    // Stores the number of steps from the start of the graph to this state
+    // along the shortest-weight path.
+    if (head < steps_.size()) {
+      max_head_steps_ = std::max(steps_[head], max_head_steps_);
+      head_steps_ = steps_[head];
+    }
+    return head;
+  }
+
+  void Enqueue(StateId s) override {
+    // We assume that there is an arc between the Head() state and this
+    // Enqueued state.
+    const ssize_t state_steps = head_steps_ + 1;
+    if (s >= steps_.size()) {
+      steps_.resize(s + 1, state_steps);
+    }
+    // This is the number of arcs in the minimum cost path from Start to s.
+    steps_[s] = state_steps;
+    if (state_steps > (max_head_steps_ - threshold_) || threshold_ < 0) {
+      Base::Enqueue(s);
+    }
+  }
+
+ private:
+  // A dense map from StateId to the number of arcs in the minimum weight
+  // path from Start to this state.
+  std::vector<ssize_t> steps_;
+  // We only keep paths that are within this number of arcs (not weight!)
+  // of the longest path.
+  const ssize_t threshold_;
+
+  // The following are mutable because Head() is const.
+  // The number of arcs traversed in the minimum cost path from the start
+  // state to the current Head() state.
+  mutable ssize_t head_steps_;
+  // The maximum number of arcs traversed by any low-cost path so far.
+  mutable ssize_t max_head_steps_;
 };
 
 // Topological-order queue discipline, templated on the StateId. States are
@@ -663,28 +743,34 @@ void AutoQueue<StateId>::SccQueueType(const Fst<Arc> &fst,
   }
 }
 
-// An A* estimate is a function object that maps from a state ID to a an
+// An A* estimate is a function object that maps from a state ID to an
 // estimate of the shortest distance to the final states.
 
 // A trivial A* estimate, yielding a queue which behaves the same in Dijkstra's
 // algorithm.
 template <typename StateId, typename Weight>
 struct TrivialAStarEstimate {
-  const Weight &operator()(StateId) const { return Weight::One(); }
+  constexpr Weight operator()(StateId) const { return Weight::One(); }
 };
 
 // A non-trivial A* estimate using a vector of the estimated future costs.
 template <typename StateId, typename Weight>
 class NaturalAStarEstimate {
  public:
-  NaturalAStarEstimate(const std::vector<Weight> &beta) :
-          beta_(beta) {}
+  NaturalAStarEstimate(const std::vector<Weight> &beta) : beta_(beta) {}
 
-  const Weight &operator()(StateId s) const { return beta_[s]; }
+  const Weight &operator()(StateId s) const {
+     return (s < beta_.size()) ? beta_[s] : kZero;
+  }
 
  private:
+  static constexpr Weight kZero = Weight::Zero();
+
   const std::vector<Weight> &beta_;
 };
+
+template <typename Arc, typename Weight>
+constexpr Weight NaturalAStarEstimate<Arc, Weight>::kZero;
 
 // Given a vector that maps from states to weights representing the shortest
 // distance from the initial state, a comparison function object between
@@ -731,7 +817,7 @@ class NaturalAStarQueue : public ShortestFirstQueue<
 
  private:
   // This is non-static because the constructor for non-idempotent weights will
-  // result in a an error.
+  // result in an error.
   const NaturalLess<Weight> less_{};
 };
 

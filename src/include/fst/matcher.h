@@ -7,6 +7,7 @@
 #define FST_MATCHER_H_
 
 #include <algorithm>
+#include <memory>
 #include <unordered_map>
 #include <utility>
 
@@ -343,22 +344,33 @@ class SortedMatcher : public MatcherBase<typename F::Arc> {
 // Returns true iff match to match_label_. The arc iterator is positioned at the
 // lower bound, that is, the first element greater than or equal to
 // match_label_, or the end if all elements are less than match_label_.
+// If multiple elements are equal to the `match_label_`, returns the rightmost
+// one.
 template <class FST>
 inline bool SortedMatcher<FST>::BinarySearch() {
-  size_t low = 0;
-  size_t high = narcs_;
-  while (low < high) {
-    const size_t mid = low + (high - low) / 2;
+  size_t size = narcs_;
+  if (size == 0) {
+    return false;
+  }
+  size_t high = size - 1;
+  while (size > 1) {
+    const size_t half = size / 2;
+    const size_t mid = high - half;
     aiter_->Seek(mid);
-    if (GetLabel() < match_label_) {
-      low = mid + 1;
-    } else {
+    if (GetLabel() >= match_label_) {
       high = mid;
     }
+    size -= half;
   }
-
-  aiter_->Seek(low);
-  return low < narcs_ && GetLabel() == match_label_;
+  aiter_->Seek(high);
+  const auto label = GetLabel();
+  if (label == match_label_) {
+    return true;
+  }
+  if (label < match_label_) {
+    aiter_->Next();
+  }
+  return false;
 }
 
 // Returns true iff match to match_label_, positioning arc iterator at lower
@@ -415,7 +427,8 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
         state_(kNoStateId),
         match_type_(match_type),
         loop_(kNoLabel, 0, Weight::One(), kNoStateId),
-        error_(false) {
+        error_(false),
+        state_table_(std::make_shared<StateTable>()) {
     switch (match_type_) {
       case MATCH_INPUT:
       case MATCH_NONE:
@@ -437,7 +450,9 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
         state_(kNoStateId),
         match_type_(matcher.match_type_),
         loop_(matcher.loop_),
-        error_(matcher.error_) {}
+        error_(matcher.error_),
+        state_table_(
+            safe ? std::make_shared<StateTable>() : matcher.state_table_) {}
 
   HashMatcher<FST> *Copy(bool safe = false) const override {
     return new HashMatcher<FST>(*this, safe);
@@ -492,7 +507,7 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
   bool Search(Label match_label);
 
   using LabelTable = std::unordered_multimap<Label, size_t>;
-  using StateTable = std::unordered_map<StateId, LabelTable>;
+  using StateTable = std::unordered_map<StateId, std::unique_ptr<LabelTable>>;
 
   std::unique_ptr<const FST> owned_fst_;  // ptr to FST if owned.
   const FST &fst_;     // FST for matching.
@@ -502,7 +517,7 @@ class HashMatcher : public MatcherBase<typename F::Arc> {
   bool current_loop_;   // Is the current arc the implicit loop?
   bool error_;          // Error encountered?
   std::unique_ptr<ArcIterator<FST>> aiter_;
-  StateTable state_table_;   // Table from states to label table.
+  std::shared_ptr<StateTable> state_table_;  // Table from state to label table.
   LabelTable *label_table_;  // Pointer to current state's label table.
   typename LabelTable::iterator label_it_;   // Position for label.
   typename LabelTable::iterator label_end_;  // Position for last label + 1.
@@ -519,13 +534,14 @@ void HashMatcher<FST>::SetState(typename FST::Arc::StateId s) {
     FSTERROR() << "HashMatcher: Bad match type";
     error_ = true;
   }
-  // Attempts to insert a new label table; if it already exists,
-  // no additional work is done and we simply return.
-  auto it_and_success = state_table_.emplace(state_, LabelTable());
+  // Attempts to insert a new label table.
+  auto it_and_success = state_table_->emplace(
+    state_, std::unique_ptr<LabelTable>(new LabelTable()));
+  // Sets instance's pointer to the label table for this state.
+  label_table_ = it_and_success.first->second.get();
+  // If it already exists, no additional work is done and we simply return.
   if (!it_and_success.second) return;
   // Otherwise, populate this new table.
-  // Sets instance's pointer to the label table for this state.
-  label_table_ = &(it_and_success.first->second);
   // Populates the label table.
   label_table_->reserve(internal::NumArcs(fst_, state_));
   const auto aiter_flags =
@@ -541,9 +557,9 @@ void HashMatcher<FST>::SetState(typename FST::Arc::StateId s) {
 template <class FST>
 inline bool HashMatcher<FST>::Search(typename FST::Arc::Label match_label) {
   auto range = label_table_->equal_range(match_label);
-  if (range.first == range.second) return false;
   label_it_ = range.first;
   label_end_ = range.second;
+  if (label_it_ == label_end_) return false;
   aiter_->Seek(label_it_->second);
   return true;
 }

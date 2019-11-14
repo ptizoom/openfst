@@ -18,7 +18,7 @@
 #include <fst/sparse-power-weight.h>
 #include <fst/string-weight.h>
 #include <fst/union-weight.h>
-#include "./weight-tester.h"
+#include <fst/test/weight-tester.h>
 
 DEFINE_int32(seed, -1, "random seed");
 DEFINE_int32(repeat, 10000, "number of test repetitions");
@@ -111,8 +111,8 @@ void TestSignedAdder(int n) {
 template <typename Weight1, typename Weight2>
 void TestWeightConversion(Weight1 w1) {
   // Tests round-trp conversion.
-  WeightConvert<Weight2, Weight1> to_w1_;
-  WeightConvert<Weight1, Weight2> to_w2_;
+  const WeightConvert<Weight2, Weight1> to_w1_;
+  const WeightConvert<Weight1, Weight2> to_w2_;
   Weight2 w2 = to_w2_(w1);
   Weight1 nw1 = to_w1_(w2);
   CHECK_EQ(w1, nw1);
@@ -246,6 +246,34 @@ void TestSparsePowerWeightGetSetValue() {
   CHECK_EQ(default_value, w.Value(31));
 }
 
+// If this test fails, it is possible that x == x will not
+// hold for FloatWeight, breaking NaturalLess and probably more.
+// To trigger these failures, use g++ -O -m32 -mno-sse.
+// Google-only...
+// This will never fail in google3, as those options aren't used.
+// ...Google-only
+template <class T>
+bool FloatEqualityIsReflexive(T m) {
+  // The idea here is that x is spilled to memory, but
+  // y remains in an 80-bit register with extra precision,
+  // causing it to compare unequal to x.
+  volatile T x = 1.111;
+  x *= m;
+
+  T y = 1.111;
+  y *= m;
+
+  return x == y;
+}
+
+void TestFloatEqualityIsReflexive() {
+  // Use a volatile test_value to avoid excessive inlining / optimization
+  // breaking what we're trying to test.
+  volatile double test_value = 1.1;
+  CHECK(FloatEqualityIsReflexive(static_cast<float>(test_value)));
+  CHECK(FloatEqualityIsReflexive(test_value));
+}
+
 }  // namespace
 
 int main(int argc, char **argv) {
@@ -269,6 +297,7 @@ int main(int argc, char **argv) {
   CHECK(LogWeightTpl<double>::Type() != LogWeightTpl<float>::Type());
   TropicalWeightTpl<double> w(2.0);
   TropicalWeight tw(2.0);
+  CHECK_EQ(w.Value(), tw.Value());
 
   TestAdder<TropicalWeight>(1000);
   TestAdder<LogWeight>(1000);
@@ -486,6 +515,8 @@ int main(int argc, char **argv) {
 
   TestPowerWeightGetSetValue();
   TestSparsePowerWeightGetSetValue();
+
+  TestFloatEqualityIsReflexive();
 
   std::cout << "PASS" << std::endl;
 

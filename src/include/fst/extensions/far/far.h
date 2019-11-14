@@ -362,7 +362,6 @@ class FstFarReader : public FarReader<A> {
       if (keys_[i].empty()) {
         if (!has_stdin_) {
           streams_[i] = &std::cin;
-          // sources_[i] = "stdin";
           has_stdin_ = true;
         } else {
           FSTERROR() << "FstFarReader::FstFarReader: standard input should "
@@ -373,6 +372,12 @@ class FstFarReader : public FarReader<A> {
       } else {
         streams_[i] = new std::ifstream(
             keys_[i], std::ios_base::in | std::ios_base::binary);
+        if (streams_[i]->fail()) {
+          FSTERROR() << "FstFarReader::FstFarReader: Error reading file: "
+                     << filenames[i];
+          error_ = true;
+          return;
+        }
       }
     }
     if (pos_ >= keys_.size()) return;

@@ -97,7 +97,7 @@ void DfsVisit(const FST &fst, Visitor *visitor, ArcFilter filter,
   using StateId = typename Arc::StateId;
   visitor->InitVisit(fst);
   const auto start = fst.Start();
-  if (start == static_cast<StateId>(kNoStateId)) {
+  if (start == kNoStateId) {
     visitor->FinishVisit();
     return;
   }
@@ -126,7 +126,8 @@ void DfsVisit(const FST &fst, Visitor *visitor, ArcFilter filter,
     while (!state_stack.empty()) {
       auto *dfs_state = state_stack.top();
       const auto s = dfs_state->state_id;
-      if (s != static_cast<StateId>(kNoStateId) && (size_t)s >= state_color.size()) {
+      if (s != static_cast<StateId>(kNoStateId)
+	      && s >= static_cast<typename FST::Arc::StateId>(state_color.size())) {
         nstates = s + 1;
         state_color.resize(nstates, kDfsWhite);
       }
