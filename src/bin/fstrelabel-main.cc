@@ -4,12 +4,13 @@
 // Relabels input or output space of an FST.
 
 #include <cstring>
-
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <fst/flags.h>
+#include <fst/types.h>
 #include <fst/util.h>
 #include <fst/script/relabel.h>
 #include <fst/script/weight-class.h>
@@ -30,7 +31,7 @@ int fstrelabel_main(int argc, char **argv) {
   using fst::SymbolTable;
   using fst::SymbolTableTextOptions;
 
-  string usage =
+  std::string usage =
       "Relabels the input and/or the output labels of the FST.\n\n"
       "  Usage: ";
   usage += argv[0];
@@ -49,9 +50,10 @@ int fstrelabel_main(int argc, char **argv) {
     return 1;
   }
 
-  const string in_name =
-      (argc > 1 && (strcmp(argv[1], "-") != 0)) ? argv[1] : "";
-  const string out_name = argc > 2 ? argv[2] : "";
+  const std::string in_name =
+      (argc > 1 && strcmp(argv[1], "-") != 0) ? argv[1] : "";
+  const std::string out_name =
+      (argc > 2 && strcmp(argv[2], "-") != 0) ? argv[2] : "";
 
   std::unique_ptr<MutableFstClass> fst(MutableFstClass::Read(in_name, true));
   if (!fst) return 1;
@@ -85,13 +87,13 @@ int fstrelabel_main(int argc, char **argv) {
                attach_new_osymbols);
   } else {
     // Reads in relabeling pairs.
-    std::vector<s::LabelPair> ipairs;
-    std::vector<s::LabelPair> opairs;
+    std::vector<std::pair<int64, int64>> ipairs;
     if (!FLAGS_relabel_ipairs.empty()) {
       if (!fst::ReadLabelPairs(FLAGS_relabel_ipairs, &ipairs,
                                    FLAGS_allow_negative_labels))
         return 1;
     }
+    std::vector<std::pair<int64, int64>> opairs;
     if (!FLAGS_relabel_opairs.empty()) {
       if (!fst::ReadLabelPairs(FLAGS_relabel_opairs, &opairs,
                                    FLAGS_allow_negative_labels))

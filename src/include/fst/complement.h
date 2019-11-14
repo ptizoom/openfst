@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+
+#include <fst/types.h>
 #include <fst/log.h>
 
 #include <fst/fst.h>
@@ -49,7 +51,7 @@ class ComplementFstImpl : public FstImpl<A> {
 
   explicit ComplementFstImpl(const Fst<Arc> &fst) : fst_(fst.Copy()) {
     SetType("complement");
-    uint64 props = fst.Properties(kILabelSorted, false);
+    const auto props = fst.Properties(kILabelSorted, false);
     SetProperties(ComplementProperties(props), kCopyProperties);
     SetInputSymbols(fst.InputSymbols());
     SetOutputSymbols(fst.OutputSymbols());
@@ -65,7 +67,7 @@ class ComplementFstImpl : public FstImpl<A> {
 
   StateId Start() const {
     if (Properties(kError)) return kNoStateId;
-    auto start = fst_->Start();
+    const auto start = fst_->Start();
     return start != kNoStateId ? start + 1 : 0;
   }
 
@@ -135,12 +137,12 @@ class ComplementFst : public ImplToFst<internal::ComplementFstImpl<A>> {
   }
 
   // See Fst<>::Copy() for doc.
-  ComplementFst(const ComplementFst<Arc> &fst, bool safe = false)
+  ComplementFst(const ComplementFst &fst, bool safe = false)
       : ImplToFst<Impl>(fst, safe) {}
 
   // Gets a copy of this FST. See Fst<>::Copy() for further doc.
-  ComplementFst<Arc> *Copy(bool safe = false) const override {
-    return new ComplementFst<Arc>(*this, safe);
+  ComplementFst *Copy(bool safe = false) const override {
+    return new ComplementFst(*this, safe);
   }
 
   inline void InitStateIterator(StateIteratorData<Arc> *data) const override;
@@ -246,9 +248,9 @@ class ArcIterator<ComplementFst<Arc>> : public ArcIteratorBase<Arc> {
     pos_ = a;
   }
 
-  uint32 Flags() const final { return kArcValueFlags; }
+  uint8 Flags() const final { return kArcValueFlags; }
 
-  void SetFlags(uint32, uint32) final {}
+  void SetFlags(uint8, uint8) final {}
 
  private:
   std::unique_ptr<ArcIterator<Fst<Arc>>> aiter_;

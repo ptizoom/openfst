@@ -12,6 +12,8 @@
 #include <utility>
 #include <vector>
 
+#include <fst/types.h>
+
 #include <fst/arcsort.h>
 #include <fst/compose.h>
 #include <fst/connect.h>
@@ -174,7 +176,7 @@ void RelationDeterminizeFilter<Arc, Relation>::InitLabelMap(
     if (arc.ilabel == label && arc.nextstate == nextstate) continue;
     DeterminizeArc<StateTuple> det_arc(arc);
     det_arc.dest_tuple->filter_state = FilterState(arc.nextstate);
-    label_map->insert(std::make_pair(arc.ilabel, det_arc));
+    label_map->emplace(arc.ilabel, det_arc);
     label = arc.ilabel;
     nextstate = arc.nextstate;
   }

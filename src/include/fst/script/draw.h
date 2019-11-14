@@ -12,17 +12,16 @@
 namespace fst {
 namespace script {
 
-// Note: it is safe to pass these strings as references because
-// this struct is only used to pass them deeper in the call graph.
-// Be sure you understand why this is so before using this struct
-// for anything else!
-struct FstDrawerArgs {
+// Note: it is safe to pass these strings as references because this struct is
+// only used to pass them deeper in the call graph. Be sure you understand why
+// this is so before using this struct for anything else!
+struct DrawArgs {
   const FstClass &fst;
   const SymbolTable *isyms;
   const SymbolTable *osyms;
   const SymbolTable *ssyms;
   const bool accep;
-  const string &title;
+  const std::string &title;
   const float width;
   const float height;
   const bool portrait;
@@ -31,17 +30,17 @@ struct FstDrawerArgs {
   const float nodesep;
   const int fontsize;
   const int precision;
-  const string &float_format;  // NOLINT
+  const std::string &float_format;  // NOLINT
   const bool show_weight_one;
-  std::ostream *ostrm;
-  const string &dest;
+  std::ostream &ostrm;
+  const std::string &dest;
 
-  FstDrawerArgs(const FstClass &fst, const SymbolTable *isyms,
-                const SymbolTable *osyms, const SymbolTable *ssyms, bool accep,
-                const string &title, float width, float height, bool portrait,
-                bool vertical, float ranksep, float nodesep, int fontsize,
-                int precision, const string &float_format,
-                bool show_weight_one, std::ostream *ostrm,  const string &dest)
+  DrawArgs(const FstClass &fst, const SymbolTable *isyms,
+           const SymbolTable *osyms, const SymbolTable *ssyms, bool accep,
+           const std::string &title, float width, float height, bool portrait,
+           bool vertical, float ranksep, float nodesep, int fontsize,
+           int precision, const std::string &float_format, bool show_weight_one,
+           std::ostream &ostrm, const std::string &dest)
       : fst(fst),
         isyms(isyms),
         osyms(osyms),
@@ -63,8 +62,8 @@ struct FstDrawerArgs {
 };
 
 template <class Arc>
-void DrawFst(FstDrawerArgs *args) {
-  const Fst<Arc> &fst = *(args->fst.GetFst<Arc>());
+void Draw(DrawArgs *args) {
+  const Fst<Arc> &fst = *args->fst.GetFst<Arc>();
   FstDrawer<Arc> fstdrawer(fst, args->isyms, args->osyms, args->ssyms,
       args->accep, args->title, args->width, args->height, args->portrait,
       args->vertical, args->ranksep, args->nodesep, args->fontsize,
@@ -72,12 +71,12 @@ void DrawFst(FstDrawerArgs *args) {
   fstdrawer.Draw(args->ostrm, args->dest);
 }
 
-void DrawFst(const FstClass &fst, const SymbolTable *isyms,
-             const SymbolTable *osyms, const SymbolTable *ssyms, bool accep,
-             const string &title, float width, float height, bool portrait,
-             bool vertical, float ranksep, float nodesep, int fontsize,
-             int precision, const string &float_format, bool show_weight_one,
-             std::ostream *ostrm, const string &dest);
+void Draw(const FstClass &fst, const SymbolTable *isyms,
+          const SymbolTable *osyms, const SymbolTable *ssyms, bool accep,
+          const std::string &title, float width, float height, bool portrait,
+          bool vertical, float ranksep, float nodesep, int fontsize,
+          int precision, const std::string &float_format, bool show_weight_one,
+          std::ostream &ostrm, const std::string &dest);
 
 }  // namespace script
 }  // namespace fst

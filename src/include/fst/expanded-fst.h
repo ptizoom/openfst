@@ -7,9 +7,11 @@
 #define FST_EXPANDED_FST_H_
 
 #include <sys/types.h>
+
 #include <istream>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <fst/log.h>
 #include <fstream>
@@ -29,11 +31,10 @@ class ExpandedFst : public Fst<A> {
   virtual StateId NumStates() const = 0;  // State count
 
   // Get a copy of this ExpandedFst. See Fst<>::Copy() for further doc.
-  ExpandedFst<Arc> *Copy(bool safe = false) const override = 0;
+  ExpandedFst *Copy(bool safe = false) const override = 0;
 
   // Read an ExpandedFst from an input stream; return NULL on error.
-  static ExpandedFst<Arc> *Read(std::istream &strm,
-                                const FstReadOptions &opts) {
+  static ExpandedFst *Read(std::istream &strm, const FstReadOptions &opts) {
     FstReadOptions ropts(opts);
     FstHeader hdr;
     if (ropts.header) {
@@ -55,20 +56,20 @@ class ExpandedFst : public Fst<A> {
     }
     auto *fst = reader(strm, ropts);
     if (!fst) return nullptr;
-    return static_cast<ExpandedFst<Arc> *>(fst);
+    return static_cast<ExpandedFst *>(fst);
   }
 
   // Read an ExpandedFst from a file; return NULL on error.
-  // Empty filename reads from standard input.
-  static ExpandedFst<Arc> *Read(const string &filename) {
-    if (!filename.empty()) {
-      std::ifstream strm(filename,
+  // Empty source reads from standard input.
+  static ExpandedFst *Read(const std::string &source) {
+    if (!source.empty()) {
+      std::ifstream strm(source,
                               std::ios_base::in | std::ios_base::binary);
       if (!strm) {
-        LOG(ERROR) << "ExpandedFst::Read: Can't open file: " << filename;
+        LOG(ERROR) << "ExpandedFst::Read: Can't open file: " << source;
         return nullptr;
       }
-      return Read(strm, FstReadOptions(filename));
+      return Read(strm, FstReadOptions(source));
     } else {
       return Read(std::cin, FstReadOptions("standard input"));
     }
@@ -124,7 +125,7 @@ class ImplToExpandedFst : public ImplToFst<Impl, FST> {
   explicit ImplToExpandedFst(std::shared_ptr<Impl> impl)
       : ImplToFst<Impl, FST>(impl) {}
 
-  ImplToExpandedFst(const ImplToExpandedFst<Impl, FST> &fst, bool safe)
+  ImplToExpandedFst(const ImplToExpandedFst &fst, bool safe)
       : ImplToFst<Impl, FST>(fst, safe) {}
 
   static Impl *Read(std::istream &strm, const FstReadOptions &opts) {
@@ -132,16 +133,16 @@ class ImplToExpandedFst : public ImplToFst<Impl, FST> {
   }
 
   // Read FST implementation from a file; return NULL on error.
-  // Empty filename reads from standard input.
-  static Impl *Read(const string &filename) {
-    if (!filename.empty()) {
-      std::ifstream strm(filename,
+  // Empty source reads from standard input.
+  static Impl *Read(const std::string &source) {
+    if (!source.empty()) {
+      std::ifstream strm(source,
                               std::ios_base::in | std::ios_base::binary);
       if (!strm) {
-        LOG(ERROR) << "ExpandedFst::Read: Can't open file: " << filename;
+        LOG(ERROR) << "ExpandedFst::Read: Can't open file: " << source;
         return nullptr;
       }
-      return Impl::Read(strm, FstReadOptions(filename));
+      return Impl::Read(strm, FstReadOptions(source));
     } else {
       return Impl::Read(std::cin, FstReadOptions("standard input"));
     }
@@ -164,11 +165,20 @@ typename Arc::StateId CountStates(const Fst<Arc> &fst) {
   }
 }
 
-// Function to return the number of arcs in an FST.
+// Function to return the number of states in a vector of FSTs, counting them if
+// necessary.
 template <class Arc>
-typename Arc::StateId CountArcs(const Fst<Arc> &fst) {
+typename Arc::StateId CountStates(const std::vector<const Fst<Arc> *> &fsts) {
+  typename Arc::StateId nstates = 0;
+  for (const auto *fst : fsts) nstates += CountStates(*fst);
+  return nstates;
+}
+
+// Function to return the number of arcs in an FST.
+template <class F>
+size_t CountArcs(const F &fst) {
   size_t narcs = 0;
-  for (StateIterator<Fst<Arc>> siter(fst); !siter.Done(); siter.Next()) {
+  for (StateIterator<F> siter(fst); !siter.Done(); siter.Next()) {
     narcs += fst.NumArcs(siter.Value());
   }
   return narcs;

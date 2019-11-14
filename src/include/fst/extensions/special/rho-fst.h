@@ -49,7 +49,7 @@ class RhoFstMatcherData {
   MatcherRewriteMode RewriteMode() const { return rewrite_mode_; }
 
  private:
-  static MatcherRewriteMode RewriteMode(const string &mode) {
+  static MatcherRewriteMode RewriteMode(const std::string &mode) {
     if (mode == "auto") return MATCHER_REWRITE_AUTO;
     if (mode == "always") return MATCHER_REWRITE_ALWAYS;
     if (mode == "never") return MATCHER_REWRITE_NEVER;
@@ -125,47 +125,28 @@ extern const char rho_fst_type[];
 extern const char input_rho_fst_type[];
 extern const char output_rho_fst_type[];
 
-using StdRhoFst =
-    MatcherFst<ConstFst<StdArc>, RhoFstMatcher<SortedMatcher<ConstFst<StdArc>>>,
+template <class Arc>
+using RhoFst =
+    MatcherFst<ConstFst<Arc>, RhoFstMatcher<SortedMatcher<ConstFst<Arc>>>,
                rho_fst_type>;
 
-using LogRhoFst =
-    MatcherFst<ConstFst<LogArc>, RhoFstMatcher<SortedMatcher<ConstFst<LogArc>>>,
-               rho_fst_type>;
+using StdRhoFst = RhoFst<StdArc>;
 
-using Log64RhoFst = MatcherFst<ConstFst<Log64Arc>,
-                               RhoFstMatcher<SortedMatcher<ConstFst<Log64Arc>>>,
-                               input_rho_fst_type>;
-
-using StdInputRhoFst =
-    MatcherFst<ConstFst<StdArc>, RhoFstMatcher<SortedMatcher<ConstFst<StdArc>>,
-                                               kRhoFstMatchInput>,
+template <class Arc>
+using InputRhoFst =
+    MatcherFst<ConstFst<Arc>,
+               RhoFstMatcher<SortedMatcher<ConstFst<Arc>>, kRhoFstMatchInput>,
                input_rho_fst_type>;
 
-using LogInputRhoFst =
-    MatcherFst<ConstFst<LogArc>, RhoFstMatcher<SortedMatcher<ConstFst<LogArc>>,
-                                               kRhoFstMatchInput>,
-               input_rho_fst_type>;
+using StdInputRhoFst = InputRhoFst<StdArc>;
 
-using Log64InputRhoFst = MatcherFst<
-    ConstFst<Log64Arc>,
-    RhoFstMatcher<SortedMatcher<ConstFst<Log64Arc>>, kRhoFstMatchInput>,
-    input_rho_fst_type>;
-
-using StdOutputRhoFst =
-    MatcherFst<ConstFst<StdArc>, RhoFstMatcher<SortedMatcher<ConstFst<StdArc>>,
-                                               kRhoFstMatchOutput>,
+template <class Arc>
+using OutputRhoFst =
+    MatcherFst<ConstFst<Arc>,
+               RhoFstMatcher<SortedMatcher<ConstFst<Arc>>, kRhoFstMatchOutput>,
                output_rho_fst_type>;
 
-using LogOutputRhoFst =
-    MatcherFst<ConstFst<LogArc>, RhoFstMatcher<SortedMatcher<ConstFst<LogArc>>,
-                                               kRhoFstMatchOutput>,
-               output_rho_fst_type>;
-
-using Log64OutputRhoFst = MatcherFst<
-    ConstFst<Log64Arc>,
-    RhoFstMatcher<SortedMatcher<ConstFst<Log64Arc>>, kRhoFstMatchOutput>,
-    output_rho_fst_type>;
+using StdOutputRhoFst = OutputRhoFst<StdArc>;
 
 }  // namespace fst
 

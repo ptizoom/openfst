@@ -1,8 +1,8 @@
 // See www.openfst.org for extensive documentation on this weighted
 // finite-state transducer library.
 
-#include <fst/script/fst-class.h>
 #include <fst/script/minimize.h>
+
 #include <fst/script/script-impl.h>
 
 namespace fst {
@@ -19,9 +19,7 @@ void Minimize(MutableFstClass *ofst1, MutableFstClass *ofst2, float delta,
   Apply<Operation<MinimizeArgs>>("Minimize", ofst1->ArcType(), &args);
 }
 
-REGISTER_FST_OPERATION(Minimize, StdArc, MinimizeArgs);
-REGISTER_FST_OPERATION(Minimize, LogArc, MinimizeArgs);
-REGISTER_FST_OPERATION(Minimize, Log64Arc, MinimizeArgs);
+REGISTER_FST_OPERATION_3ARCS(Minimize, MinimizeArgs);
 
 }  // namespace script
 }  // namespace fst

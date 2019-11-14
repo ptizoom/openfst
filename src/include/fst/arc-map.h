@@ -12,6 +12,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include <fst/types.h>
 #include <fst/log.h>
 
 #include <fst/cache.h>
@@ -47,8 +48,8 @@ enum MapSymbolsAction {
 };
 
 // The ArcMapper interfaces defines how arcs and final weights are mapped.
-// This is useful for implementing operations that do not change the number of
-// arcs (except possibly superfinal arcs).
+// This is useful for implementing operations that apply to each arc separately
+// and do not change the number of arcs (except possibly superfinal arcs).
 //
 // template <class A, class B>
 // class ArcMapper {
@@ -107,7 +108,7 @@ void ArcMap(MutableFst<A> *fst, C *mapper) {
   auto superfinal = kNoStateId;
   if (final_action == MAP_REQUIRE_SUPERFINAL) {
     superfinal = fst->AddState();
-    fst->SetFinal(superfinal, Weight::One());
+    fst->SetFinal(superfinal);
   }
   for (StateIterator<MutableFst<FromArc>> siter(*fst); !siter.Done();
        siter.Next()) {
@@ -137,7 +138,7 @@ void ArcMap(MutableFst<A> *fst, C *mapper) {
             // Add a superfinal state if not already done.
             if (superfinal == kNoStateId) {
               superfinal = fst->AddState();
-              fst->SetFinal(superfinal, Weight::One());
+              fst->SetFinal(superfinal);
             }
             final_arc.nextstate = superfinal;
             fst->AddArc(state, std::move(final_arc));
@@ -208,7 +209,7 @@ void ArcMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
   StateId superfinal = kNoStateId;
   if (final_action == MAP_REQUIRE_SUPERFINAL) {
     superfinal = ofst->AddState();
-    ofst->SetFinal(superfinal, B::Weight::One());
+    ofst->SetFinal(superfinal);
   }
   for (StateIterator<Fst<A>> siter(ifst); !siter.Done(); siter.Next()) {
     StateId s = siter.Value();
@@ -235,7 +236,7 @@ void ArcMap(const Fst<A> &ifst, MutableFst<B> *ofst, C *mapper) {
           // Add a superfinal state if not already done.
           if (superfinal == kNoStateId) {
             superfinal = ofst->AddState();
-            ofst->SetFinal(superfinal, B::Weight::One());
+            ofst->SetFinal(superfinal);
           }
           final_arc.nextstate = superfinal;
           ofst->AddArc(s, std::move(final_arc));
@@ -362,7 +363,7 @@ class ArcMapFstImpl : public CacheImpl<B> {
         }
         case MAP_ALLOW_SUPERFINAL: {
           if (s == superfinal_) {
-            SetFinal(s, Weight::One());
+            SetFinal(s);
           } else {
             const auto final_arc =
                 (*mapper_)(A(0, 0, fst_->Final(FindIState(s)), kNoStateId));
@@ -540,12 +541,12 @@ class ArcMapFst : public ImplToFst<internal::ArcMapFstImpl<A, B, C>> {
             std::make_shared<Impl>(fst, mapper, ArcMapFstOptions())) {}
 
   // See Fst<>::Copy() for doc.
-  ArcMapFst(const ArcMapFst<A, B, C> &fst, bool safe = false)
+  ArcMapFst(const ArcMapFst &fst, bool safe = false)
       : ImplToFst<Impl>(fst, safe) {}
 
   // Get a copy of this ArcMapFst. See Fst<>::Copy() for further doc.
-  ArcMapFst<A, B, C> *Copy(bool safe = false) const override {
-    return new ArcMapFst<A, B, C>(*this, safe);
+  ArcMapFst *Copy(bool safe = false) const override {
+    return new ArcMapFst(*this, safe);
   }
 
   inline void InitStateIterator(StateIteratorData<B> *data) const override;
@@ -721,7 +722,7 @@ class SuperFinalMapper {
   using Weight = typename FromArc::Weight;;
 
   // Arg allows setting super-final label.
-  explicit SuperFinalMapper(Label final_label = 0)
+  constexpr explicit SuperFinalMapper(Label final_label = 0)
       : final_label_(final_label) {}
 
   ToArc operator()(const FromArc &arc) const {
@@ -755,7 +756,7 @@ class SuperFinalMapper {
   }
 
  private:
-  Label final_label_;
+  const Label final_label_;
 };
 
 // Mapper that leaves labels and nextstate unchanged and constructs a new weight
@@ -961,9 +962,9 @@ class GallicToNewSymbolsMapper {
     fst_->DeleteStates();
     state_ = fst_->AddState();
     fst_->SetStart(state_);
-    fst_->SetFinal(state_, AW::One());
+    fst_->SetFinal(state_);
     if (osymbols_) {
-      string name = osymbols_->Name() + "_from_gallic";
+      std::string name = osymbols_->Name() + "_from_gallic";
       fst_->SetInputSymbols(new SymbolTable(name));
       isymbols_ = fst_->MutableInputSymbols();
       const int64 zero = 0;
@@ -984,7 +985,7 @@ class GallicToNewSymbolsMapper {
     if (w1.Size() == 0) {
       l = 0;
     } else {
-      auto insert_result = map_.insert(std::make_pair(w1, kNoLabel));
+      auto insert_result = map_.emplace(w1, kNoLabel);
       if (!insert_result.second) {
         l = insert_result.first->second;
       } else {
@@ -992,11 +993,11 @@ class GallicToNewSymbolsMapper {
         insert_result.first->second = l;
         StringWeightIterator<SW> iter1(w1);
         StateId n;
-        string s;
+        std::string s;
         for (size_t i = 0, p = state_; i < w1.Size();
              ++i, iter1.Next(), p = n) {
           n = i == w1.Size() - 1 ? state_ : fst_->AddState();
-          fst_->AddArc(p, ToArc(i ? 0 : l, iter1.Value(), AW::One(), n));
+          fst_->AddArc(p, ToArc(i ? 0 : l, iter1.Value(), n));
           if (isymbols_) {
             if (i) s = s + "_";
             s = s + osymbols_->Find(iter1.Value());

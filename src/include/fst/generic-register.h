@@ -11,7 +11,6 @@
 #include <map>
 #include <string>
 
-#include <fst/types.h>
 #include <fst/log.h>
 
 // Generic class representing a globally-stored correspondence between
@@ -44,7 +43,7 @@ class GenericRegister {
 
   void SetEntry(const KeyType &key, const EntryType &entry) {
     MutexLock l(&register_lock_);
-    register_table_.insert(std::make_pair(key, entry));
+    register_table_.emplace(key, entry);
   }
 
   EntryType GetEntry(const KeyType &key) const {
@@ -88,7 +87,7 @@ class GenericRegister {
   }
 
   // Override this to define how to turn a key into an SO filename.
-  virtual string ConvertKeyToSoFilename(const KeyType &key) const = 0;
+  virtual std::string ConvertKeyToSoFilename(const KeyType &key) const = 0;
 
   virtual const EntryType *LookupEntry(const KeyType &key) const {
     MutexLock l(&register_lock_);

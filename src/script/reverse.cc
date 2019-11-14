@@ -1,8 +1,8 @@
 // See www.openfst.org for extensive documentation on this weighted
 // finite-state transducer library.
 
-#include <fst/script/fst-class.h>
 #include <fst/script/reverse.h>
+
 #include <fst/script/script-impl.h>
 
 namespace fst {
@@ -18,9 +18,7 @@ void Reverse(const FstClass &ifst, MutableFstClass *ofst,
   Apply<Operation<ReverseArgs>>("Reverse", ifst.ArcType(), &args);
 }
 
-REGISTER_FST_OPERATION(Reverse, StdArc, ReverseArgs);
-REGISTER_FST_OPERATION(Reverse, LogArc, ReverseArgs);
-REGISTER_FST_OPERATION(Reverse, Log64Arc, ReverseArgs);
+REGISTER_FST_OPERATION_3ARCS(Reverse, ReverseArgs);
 
 }  // namespace script
 }  // namespace fst
