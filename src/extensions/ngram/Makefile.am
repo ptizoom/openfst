@@ -1,13 +1,13 @@
 AM_CPPFLAGS = -I$(srcdir)/../../include $(ICU_CPPFLAGS)
-LIBS = ../../lib/libfst.la -lm $(DL_LIBS)
+LIBS = ../../lib/libopenfst.la -lm $(DL_LIBS)
 
 libopenfstdir = @libfstdir@
-libopenfst_LTLIBRARIES = ngram-fst.la
+libopenfst_LTLIBRARIES = libngram-fst.la
 
-lib_LTLIBRARIES = libfstngram.la
+#lib_LTLIBRARIES = libfstngram.la
 
-ngram_fst_la_SOURCES = bitmap-index.cc ngram-fst.cc nthbit.cc
-ngram_fst_la_LDFLAGS = -avoid-version -module
+libngram_fst_la_SOURCES = bitmap-index.cc ngram-fst.cc nthbit.cc
+libngram_fst_la_LDFLAGS = -avoid-version -module
 
-libfstngram_la_SOURCES = bitmap-index.cc ngram-fst.cc nthbit.cc
-libfstngram_la_LDFLAGS = -version-info 18:0:0
+#libfstngram_la_SOURCES = bitmap-index.cc ngram-fst.cc nthbit.cc
+#libfstngram_la_LDFLAGS = -version-info 18:0:0
