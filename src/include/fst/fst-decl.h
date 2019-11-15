@@ -153,7 +153,7 @@ class UnionFst;
 
 // Heap.
 
-template <class T, class Compare, typename ID = unsigned int>
+template <class T, class Compare>
 class Heap;
 
 // ArcCompactors.

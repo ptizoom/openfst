@@ -63,7 +63,19 @@ inline Dest bit_cast(const Source &source) {
 
 // Checksums.
 class CheckSummer {
-  static const int kCheckSumLength = 32;
+ public:
+  CheckSummer();
+
+  void Reset();
+
+  void Update(void const *data, int size);
+
+  void Update(std::string const &data);
+
+  std::string Digest() { return check_sum_; }
+
+ private:
+  constexpr static int kCheckSumLength = 32;
   int count_;
   std::string check_sum_;
 

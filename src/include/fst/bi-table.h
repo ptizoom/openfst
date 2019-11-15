@@ -194,8 +194,8 @@ class CompactHashBiTable {
     explicit HashFunc(const CompactHashBiTable &ht) : ht_(&ht) {}
 
     size_t operator()(I k) const {
-      ////PTZ191115 U ]-1 .. -3] are forbiden states
-      if ((k + 3) >= (kCurrentKey + 3) && k < kDeletedKey) {
+      ////PTZ191115 U ]-1 .. -1] are no forbiden states !
+      if (1 || (k + 1) >= 0 && k <  kCurrentKey) {
         return (*ht_->hash_func_)(ht_->Key2Entry(k));
       } else {
         return 0;
@@ -213,11 +213,11 @@ class CompactHashBiTable {
     bool operator()(I k1, I k2) const {
       if (k1 == k2) {
         return true;
-      } else if ( ////PTZ191115 U ]-1 .. -3] are forbiden states
-		 (k1 + 3) >= (kCurrentKey + 3)
-		 && (k2 + 3) >= (kCurrentKey + 3)
-		 && k1 < kDeletedKey
-		 && k2 < kDeletedKey
+      } else if (1 || //PTZ191115 U ]-1 .. -1] are no forbiden states
+		 (k1 + 1) >= 0
+		 && (k2 + 1) >= 0
+		 && k1 < kCurrentKey
+		 && k2 < kCurrentKey
 		 ) {
         return (*ht_->hash_equal_)(ht_->Key2Entry(k1), ht_->Key2Entry(k2));
       } else {

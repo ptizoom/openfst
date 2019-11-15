@@ -60,7 +60,7 @@ class Partition {
   // are not assigned to a class (i.e class_index = -1); you should set up the
   // number of classes using AllocateClasses() or AddClass(), and allocate each
   // element to a class by calling Add(element, class_id).
-  void Initialize(size_t num_elements) {
+  void Initialize(T num_elements) {
     elements_.resize(num_elements);
     classes_.reserve(num_elements);
     classes_.clear();
@@ -90,7 +90,8 @@ class Partition {
     ++this_class.size;
     // Adds the element to the 'no' subset of the class.
     auto no_head = this_class.no_head;
-    if (no_head >= 0) elements_[no_head].prev_element = element_id;
+    //PTZ191115 do set when kNoStateId (0 > -1)
+    if (no_head >= 0 && no_head != kNoStateId) elements_[no_head].prev_element = element_id;
     this_class.no_head = element_id;
     this_element.class_id = class_id;
     // Adds to the 'no' subset of the class.
@@ -109,12 +110,12 @@ class Partition {
     --old_class.size;
     // Excises the element from the 'no' list of its old class, where it is
     // assumed to be.
-    if (element.prev_element >= 0) {
+    if (element.prev_element != kNoStateId) { //PTZ191115 do set when kNoStateId
       elements[element.prev_element].next_element = element.next_element;
     } else {
       old_class.no_head = element.next_element;
     }
-    if (element.next_element >= 0) {
+    if (element.next_element != kNoStateId) { //PTZ191115 do set when kNoStateId
       elements[element.next_element].prev_element = element.prev_element;
     }
     // Adds to new class.
@@ -132,23 +133,23 @@ class Partition {
     auto class_id = element.class_id;
     auto &this_class = classes_[class_id];
     // Excises the element from the 'no' list of its class.
-    if (element.prev_element >= 0) {
+    if (element.prev_element != kNoStateId) { //PTZ191115 do set when kNoStateId
       elements[element.prev_element].next_element = element.next_element;
     } else {
       this_class.no_head = element.next_element;
     }
-    if (element.next_element >= 0) {
+    if (element.next_element != kNoStateId) { //PTZ191115 do set when kNoStateId
       elements[element.next_element].prev_element = element.prev_element;
     }
     // Adds the element to the 'yes' list.
-    if (this_class.yes_head >= 0) {
+    if (this_class.yes_head != kNoStateId) { //PTZ191115 do set when kNoStateId
       elements[this_class.yes_head].prev_element = element_id;
     } else {
       visited_classes_.push_back(class_id);
     }
     element.yes = yes_counter_;
     element.next_element = this_class.yes_head;
-    element.prev_element = -1;
+    element.prev_element = kNoStateId; //PTZ191115 do set when kNoStateId
     this_class.yes_head = element_id;
     this_class.yes_size++;
   }
@@ -165,7 +166,7 @@ class Partition {
   void FinalizeSplit(Queue *queue) {
     for (const auto &visited_class : visited_classes_) {
       const auto new_class = SplitRefine(visited_class);
-      if (new_class != -1 && queue) queue->Enqueue(new_class);
+      if (new_class != kNoStateId && queue) queue->Enqueue(new_class); //PTZ191115 
     }
     visited_classes_.clear();
     // Incrementation sets all the 'yes' members of the elements to false.
@@ -253,7 +254,9 @@ class Partition {
       }
       auto elements = &(elements_[0]);
       // Updates the 'class_id' of all the elements we moved.
-      for (auto e = new_class.no_head; e >= 0; e = elements[e].next_element) {
+      for (auto e = new_class.no_head
+	     ; e != kNoStateId //PTZ191115 do set when kNoStateId 
+	     ; e = elements[e].next_element) {
         elements[e].class_id = new_class_id;
       }
       return new_class_id;
@@ -285,7 +288,8 @@ class PartitionIterator {
         element_id_(partition_.classes_[class_id].no_head),
         class_id_(class_id) {}
 
-  bool Done() { return element_id_ < 0; }
+  //bool Done() { return element_id_ < 0; } 
+  bool Done() { return element_id_ == kNoStateId; } //PTZ191115 do set when kNoStateId (0 > -1)
 
   const T Value() { return element_id_; }
 

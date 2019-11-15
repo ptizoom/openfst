@@ -46,12 +46,16 @@ class StateComparator {
 
   // Compares state x with state y based on sort criteria.
   bool operator()(const StateId x, const StateId y) const {
+    //PTZ191115 do set when kNoStateId ? not sure it is the right call?
+    if (x == kNoStateId) {return true;}
+    if (y == kNoStateId) {return false;}
+
     // Checks for final state equivalence.
     const auto xfinal = fst_.Final(x).Hash();
     const auto yfinal = fst_.Final(y).Hash();
-    if (xfinal < yfinal) {
+    if (xfinal < yfinal || xfinal == kNoStateId) { //PTZ191115 do set when kNoStateId ? not sure it is the right call?
       return true;
-    } else if (xfinal > yfinal) {
+    } else if (xfinal > yfinal || yfinal == kNoStateId) { //PTZ191115 do set when kNoStateId ? not sure it is the right call?
       return false;
     }
     // Checks for number of arcs.
@@ -317,6 +321,7 @@ class AcyclicMinimizer {
 
     // Invoked when state is discovered (2nd arg is DFS tree root).
     bool InitState(StateId s, StateId root) {
+      DCHECK_NE(s, kNoStateId); //PTZ191115 do not want to handle that illegal state
       // Extends height array and initialize height (distance) to 0.
       for (StateId i = height_.size(); i <= s; ++i) height_.push_back(-1);
       if (s >= num_states_) num_states_ = s + 1;
@@ -339,9 +344,10 @@ class AcyclicMinimizer {
 
     // Invoked when state finished (parent is kNoStateId for tree root).
     void FinishState(StateId s, StateId parent, const Arc *parent_arc) {
-      if (height_[s] == -1) height_[s] = 0;
-      const auto h = height_[s] + 1;
-      if (parent >= 0) {
+      DCHECK_NE(s, kNoStateId); //PTZ191115 do not want to handle that illegal state
+      if (height_[s] == kNoStateId) height_[s] = 0;
+      if (parent != kNoStateId) { //PTZ191115 do not want to handle that illegal state
+	const auto h = height_[s] + 1;
         if (h > height_[parent]) height_[parent] = h;
         if (h > max_height_) max_height_ = h;
       }
@@ -386,11 +392,12 @@ class AcyclicMinimizer {
       // Sorts states within equivalence class.
       PartitionIterator<StateId> siter(partition_, h);
       equiv_classes[siter.Value()] = h;
-      for (siter.Next(); !siter.Done(); siter.Next()) {
-        auto insert_result = equiv_classes.emplace(siter.Value(), kNoStateId);
-        if (insert_result.second) {
-          insert_result.first->second = partition_.AddClass();
-        }
+      while (!siter.Done()) { //PTZ191115 for (siter.Next(); !siter.Done(); siter.Next())
+	siter.Next();
+	auto insert_result = equiv_classes.emplace(siter.Value(), kNoStateId);
+	if (insert_result.second) {
+	  insert_result.first->second = partition_.AddClass();
+	}
       }
       // Creates refined partition.
       for (siter.Reset(); !siter.Done();) {

@@ -28,7 +28,7 @@ bool Verify(const Fst<Arc> &fst, bool allow_negative_labels = false) {
   } else if (start == kNoStateId && ns > 0) {
     LOG(ERROR) << "Verify: FST start state ID not set";
     return false;
-  } else if (start >= ns) {
+  } else if (start != kNoStateId && start >= ns) { //PTZ191115 
     LOG(ERROR) << "Verify: FST start state ID exceeds number of states";
     return false;
   }

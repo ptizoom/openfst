@@ -425,14 +425,18 @@ class TopOrderQueue : public QueueBase<S> {
   StateId Head() const final { return state_[front_]; }
 
   void Enqueue(StateId s) final {
-    if (front_ > back_) {
-      front_ = back_ = order_[s];
-    } else if (order_[s] > back_) {
-      back_ = order_[s];
-    } else if (order_[s] < front_) {
-      front_ = order_[s];
+    StateId i = order_[s];
+    DCHECK_NE(i, kNoStateId); //PTZ191115 do not want to handle that illegal state
+    if (front_ > back_
+	|| front_ == kNoStateId
+	|| back_  == kNoStateId) { //PTZ191115 handling back_=-1
+      front_ = back_ = i;
+    } else if (i > back_) {
+      back_ = i;
+    } else if (i < front_) {
+      front_ = i;
     }
-    state_[order_[s]] = s;
+    state_[i] = s;
   }
 
   void Dequeue() final {
@@ -445,9 +449,14 @@ class TopOrderQueue : public QueueBase<S> {
   bool Empty() const final { return front_ > back_; }
 
   void Clear() final {
-    for (StateId s = front_; s <= back_; ++s) state_[s] = kNoStateId;
-    back_ = kNoStateId;
+    if (back_ != kNoStateId) { //PTZ191115 it happens; then likely  state_[] is size null.
+      for (StateId s = front_; s <= back_; ++s) state_[s] = kNoStateId;
+      back_ = kNoStateId;
+    } else {
+      VLOG(0) << "TopOrderQueue:(back_ == kNoStateId)::states to clear were not yet defined";
+    }
     front_ = 0;
+    state_[front_] = kNoStateId;
   }
 
  private:
@@ -472,7 +481,10 @@ class StateOrderQueue : public QueueBase<S> {
   StateId Head() const final { return front_; }
 
   void Enqueue(StateId s) final {
-    if (front_ > back_) {
+    DCHECK_NE(s, kNoStateId); //PTZ191115 do not want to handle that illegal state
+    if (this->Empty()
+	//front_ > back_ || back_ == kNoStateId
+	) { //PTZ191115 do set when kNoStateId (0 > -1)      
       front_ = back_ = s;
     } else if (s > back_) {
       back_ = s;
@@ -484,16 +496,22 @@ class StateOrderQueue : public QueueBase<S> {
   }
 
   void Dequeue() final {
+    DCHECK_NE(front_, kNoStateId); //PTZ191115 do not want to handle that illegal state
     enqueued_[front_] = false;
-    while ((front_ <= back_) && (enqueued_[front_] == false)) ++front_;
+    while ((front_ < (back_ + 1)) //PTZ191115 do not set when kNoStateId (0 <= -1)
+	   && (enqueued_[front_] == false)) ++front_;
   }
 
   void Update(StateId) final {}
 
-  bool Empty() const final { return front_ > back_; }
+  bool Empty() const final {
+    //PTZ191115 do set when kNoStateId (0 > -1)
+    return (front_ > back_) || (back_ == kNoStateId);
+  }
 
   void Clear() final {
-    for (StateId i = front_; i <= back_; ++i) enqueued_[i] = false;
+    DCHECK_NE(front_, kNoStateId); //PTZ191115 do not want to handle that illegal state
+    for (StateId i = front_; i < (back_ + 1); ++i) enqueued_[i] = false;
     front_ = 0;
     back_ = kNoStateId;
   }
@@ -526,6 +544,7 @@ class SccQueue : public QueueBase<S> {
 
   StateId Head() const final {
     while ((front_ <= back_) &&
+	   (back_ != kNoStateId) && //PTZ191115 do not set when kNoStateId (0 <= -1)
            (((*queue_)[front_] && (*queue_)[front_]->Empty()) ||
             (((*queue_)[front_] == nullptr) &&
              ((front_ >= trivial_queue_.size()) ||
@@ -540,20 +559,22 @@ class SccQueue : public QueueBase<S> {
   }
 
   void Enqueue(StateId s) final {
-    if (front_ > back_) {
-      front_ = back_ = scc_[s];
-    } else if (scc_[s] > back_) {
-      back_ = scc_[s];
-    } else if (scc_[s] < front_) {
-      front_ = scc_[s];
+    StateId i = scc_[s];
+    DCHECK_NE(i, kNoStateId); //PTZ191115 do not want to handle that illegal state    
+    if ((front_ > back_) || (back_ == kNoStateId)) { //PTZ191115 do set when kNoStateId (0 > -1)
+      front_ = back_ = i;
+    } else if (i > back_) {
+      back_ = i;
+    } else if (i < front_) {
+      front_ = i;
     }
-    if ((*queue_)[scc_[s]]) {
-      (*queue_)[scc_[s]]->Enqueue(s);
+    if ((*queue_)[i]) {
+      (*queue_)[i]->Enqueue(s);
     } else {
-      while (trivial_queue_.size() <= scc_[s]) {
+      while (trivial_queue_.size() <= i) {
         trivial_queue_.push_back(kNoStateId);
       }
-      trivial_queue_[scc_[s]] = s;
+      trivial_queue_[i] = s;
     }
   }
 
@@ -571,9 +592,9 @@ class SccQueue : public QueueBase<S> {
 
   bool Empty() const final {
     // Queues SCC number back_ is not empty unless back_ == front_.
-    if (front_ < back_) {
+    if ((front_ < back_) && (back_ != kNoStateId)) { //PTZ191115 do set when kNoStateId (0 > -1)
       return false;
-    } else if (front_ > back_) {
+    } else if ((front_ > back_) || (back_ == kNoStateId)) { //PTZ191115 do set when kNoStateId (0 > -1)
       return true;
     } else if ((*queue_)[front_]) {
       return (*queue_)[front_]->Empty();
@@ -584,7 +605,8 @@ class SccQueue : public QueueBase<S> {
   }
 
   void Clear() final {
-    for (StateId i = front_; i <= back_; ++i) {
+    DCHECK_NE(front_, kNoStateId); //PTZ191115 do not want to handle that illegal state
+    for (StateId i = front_; i < (back_ + 1); ++i) {
       if ((*queue_)[i]) {
         (*queue_)[i]->Clear();
       } else if (i < trivial_queue_.size()) {

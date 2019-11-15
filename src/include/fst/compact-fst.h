@@ -276,6 +276,7 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
     const Fst<Arc> &fst, const ArcCompactor &arc_compactor) {
   using StateId = typename Arc::StateId;
   using Weight = typename Arc::Weight;
+  using Label = typename Arc::Label;
   start_ = fst.Start();
   // Counts # of states and arcs.
   StateId nfinals = 0;
@@ -313,7 +314,9 @@ DefaultCompactStore<Element, Unsigned>::DefaultCompactStore(
     if (arc_compactor.Size() == -1) states_[s] = pos;
     if (fst.Final(s) != Weight::Zero()) {
       compacts_[pos++] = arc_compactor.Compact(
-          s, Arc(kNoLabel, kNoLabel, fst.Final(s), kNoStateId));
+          s, Arc(static_cast<Label>(kNoLabel)
+		 , static_cast<Label>(kNoLabel)
+		 , fst.Final(s), kNoStateId));
     }
     for (ArcIterator<Fst<Arc>> aiter(fst, s); !aiter.Done(); aiter.Next()) {
       compacts_[pos++] = arc_compactor.Compact(s, aiter.Value());

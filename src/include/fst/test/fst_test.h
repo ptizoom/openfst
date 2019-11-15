@@ -83,11 +83,11 @@ class FstTester {
       CHECK_EQ(fst.NumInputEpsilons(s), 0);
       CHECK_EQ(fst.NumOutputEpsilons(s), s + 1);
       CHECK(!matcher.Find(s + 2));     // out-of-range
-      CHECK(!matcher.Find(kNoLabel));  // no explicit input epsilons
-      //PTZ191115 CHECK(!matcher.Find(static_cast<Label>(kNoLabel)));  // no explicit epsilons
+      //PTZ191115 cast ?
+      CHECK(!matcher.Find(static_cast<Label>(kNoLabel)));  // no explicit epsilons
       CHECK(matcher.Find(0));
-      CHECK_EQ(matcher.Value().ilabel, kNoLabel);  // implicit epsilon loop
-      //PTZ191115 CHECK_EQ(matcher.Value().ilabel, static_cast<Label>(kNoLabel));  // implicit epsilon loop
+      //PTZ191115 cast 
+      CHECK_EQ(matcher.Value().ilabel, static_cast<Label>(kNoLabel));  // implicit epsilon loop
       ++ns;
     }
     CHECK_EQ(num_states_, ns);
