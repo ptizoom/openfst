@@ -43,7 +43,8 @@ DECLARE_bool(fst_compat_symbols);
 
 namespace fst {
 
-constexpr int64 kNoSymbol = -1;
+  //PTZ191116 constexpr int64 kNoSymbol = -1;
+  constexpr std::size_t kNoSymbol = -1;
 
 class SymbolTable;
 
@@ -54,11 +55,11 @@ struct SymbolTableReadOptions {
   SymbolTableReadOptions() {}
 
   SymbolTableReadOptions(
-      std::vector<std::pair<int64, int64>> string_hash_ranges,
+      std::vector<std::pair<std::size_t, std::size_t>> string_hash_ranges,
       const std::string &source)
       : string_hash_ranges(std::move(string_hash_ranges)), source(source) {}
 
-  std::vector<std::pair<int64, int64>> string_hash_ranges;
+  std::vector<std::pair<std::size_t, std::size_t>> string_hash_ranges;
   std::string source;
 };
 
@@ -87,9 +88,9 @@ class DenseSymbolMap {
 
   DenseSymbolMap();
 
-  std::pair<int64, bool> InsertOrFind(KeyType key);
+  std::pair<std::size_t, bool> InsertOrFind(KeyType key);
 
-  int64 Find(KeyType key) const;
+  std::size_t Find(KeyType key) const;
 
   size_t Size() const { return symbols_.size(); }
 
@@ -100,7 +101,7 @@ class DenseSymbolMap {
   void ShrinkToFit();
 
  private:
-  static constexpr int64 kEmptyBucket = -1;
+  static constexpr std::size_t kEmptyBucket = -1;
 
   // num_buckets must be power of 2.
   void Rehash(size_t num_buckets);
@@ -111,8 +112,8 @@ class DenseSymbolMap {
       typename std::remove_reference<KeyType>::type>::type>
       str_hash_;
   std::vector<std::string> symbols_;
-  std::vector<int64> buckets_;
-  uint64 hash_mask_;
+  std::vector<std::size_t> buckets_;
+  std::size_t hash_mask_;
 };
 
 // Base class for SymbolTable implementations.
@@ -133,22 +134,22 @@ class SymbolTableImplBase {
 
   virtual bool Write(std::ostream &strm) const = 0;
 
-  virtual int64 AddSymbol(SymbolType symbol, int64 key) = 0;
-  virtual int64 AddSymbol(SymbolType symbol) = 0;
+  virtual std::size_t AddSymbol(SymbolType symbol, std::size_t key) = 0;
+  virtual std::size_t AddSymbol(SymbolType symbol) = 0;
 
-  virtual void RemoveSymbol(int64 key) = 0;
+  virtual void RemoveSymbol(std::size_t key) = 0;
 
-  virtual std::string Find(int64 key) const = 0;
-  virtual int64 Find(SymbolType symbol) const = 0;
+  virtual std::string Find(std::size_t key) const = 0;
+  virtual std::size_t Find(SymbolType symbol) const = 0;
 
-  virtual bool Member(int64 key) const { return !Find(key).empty(); }
+  virtual bool Member(std::size_t key) const { return !Find(key).empty(); }
   virtual bool Member(SymbolType symbol) const {
     return Find(symbol) != kNoSymbol;
   }
 
   virtual void AddTable(const SymbolTable &table) = 0;
 
-  virtual int64 GetNthKey(ssize_t pos) const = 0;
+  virtual std::size_t GetNthKey(size_t pos) const = 0;
 
   virtual const std::string &Name() const = 0;
   virtual void SetName(const std::string &new_name) = 0;
@@ -156,7 +157,7 @@ class SymbolTableImplBase {
   virtual const std::string &CheckSum() const = 0;
   virtual const std::string &LabeledCheckSum() const = 0;
 
-  virtual int64 AvailableKey() const = 0;
+  virtual std::size_t AvailableKey() const = 0;
   virtual size_t NumSymbols() const = 0;
 
   virtual bool IsMutable() const = 0;
@@ -174,9 +175,9 @@ class ConstSymbolTableImpl : public SymbolTableImplBase {
  public:
   std::unique_ptr<SymbolTableImplBase> Copy() const final;
 
-  int64 AddSymbol(SymbolType symbol, int64 key) final;
-  int64 AddSymbol(SymbolType symbol) final;
-  void RemoveSymbol(int64 key) final;
+  std::size_t AddSymbol(SymbolType symbol, std::size_t key) final;
+  std::size_t AddSymbol(SymbolType symbol) final;
+  void RemoveSymbol(std::size_t key) final;
   void SetName(const std::string &new_name) final;
   void AddTable(const SymbolTable &table) final;
   bool IsMutable() const final { return false; }
@@ -207,16 +208,16 @@ class SymbolTableImpl final : public MutableSymbolTableImpl {
     return std::unique_ptr<SymbolTableImplBase>(new SymbolTableImpl(*this));
   }
 
-  int64 AddSymbol(SymbolType symbol, int64 key) override;
+  std::size_t AddSymbol(SymbolType symbol, std::size_t key) override;
 
-  int64 AddSymbol(SymbolType symbol) override {
+  std::size_t AddSymbol(SymbolType symbol) override {
     return AddSymbol(symbol, available_key_);
   }
 
   // Removes the symbol with the given key. The removal is costly
   // (O(NumSymbols)) and may reduce the efficiency of Find() because of a
   // potentially reduced size of the dense key interval.
-  void RemoveSymbol(int64 key) override;
+  void RemoveSymbol(std::size_t key) override;
 
   static SymbolTableImpl *ReadText(
       std::istream &strm, const std::string &name,
@@ -229,18 +230,18 @@ class SymbolTableImpl final : public MutableSymbolTableImpl {
 
   // Returns the string associated with the key. If the key is out of
   // range (<0, >max), return an empty string.
-  std::string Find(int64 key) const override;
+  std::string Find(std::size_t key) const override;
 
   // Returns the key associated with the symbol; if the symbol
   // does not exists, returns kNoSymbol.
-  int64 Find(SymbolType symbol) const override {
-    int64 idx = symbols_.Find(symbol);
+  std::size_t Find(SymbolType symbol) const override {
+    size_t idx = symbols_.Find(symbol);
     if (idx == kNoSymbol || idx < dense_key_limit_) return idx;
     return idx_key_[idx - dense_key_limit_];
   }
 
-  int64 GetNthKey(ssize_t pos) const override {
-    if (pos < 0 || pos >= symbols_.Size()) return kNoSymbol;
+  size_t GetNthKey(size_t pos) const override {
+    if (pos == kNoSymbol || pos >= symbols_.Size()) return kNoSymbol;
     if (pos < dense_key_limit_) return pos;
     return Find(symbols_.GetSymbol(pos));
   }
@@ -259,7 +260,7 @@ class SymbolTableImpl final : public MutableSymbolTableImpl {
     return labeled_check_sum_string_;
   }
 
-  int64 AvailableKey() const override { return available_key_; }
+  size_t AvailableKey() const override { return available_key_; }
 
   size_t NumSymbols() const override { return symbols_.Size(); }
 
@@ -273,16 +274,16 @@ class SymbolTableImpl final : public MutableSymbolTableImpl {
   void MaybeRecomputeCheckSum() const;
 
   std::string name_;
-  int64 available_key_;
-  int64 dense_key_limit_;
+  size_t available_key_;
+  size_t dense_key_limit_;
 
   DenseSymbolMap symbols_;
   // Maps index to key for index >= dense_key_limit:
   //   key = idx_key_[index - dense_key_limit]
-  std::vector<int64> idx_key_;
+  std::vector<std::size_t> idx_key_;
   // Maps key to index for key >= dense_key_limit_.
   //  index = key_map_[key]
-  std::map<int64, int64> key_map_;
+  std::map<std::size_t, std::size_t> key_map_;
 
   mutable bool check_sum_finalized_;
   mutable std::string check_sum_string_;
@@ -372,42 +373,42 @@ class SymbolTable {
 
   // Adds a symbol with given key to table. A symbol table also keeps track of
   // the last available key (highest key value in the symbol table).
-  int64 AddSymbol(SymbolType symbol, int64 key) {
+  std::size_t AddSymbol(SymbolType symbol, std::size_t key) {
     MutateCheck();
     return impl_->AddSymbol(symbol, key);
   }
 
   // Adds a symbol to the table. The associated value key is automatically
   // assigned by the symbol table.
-  int64 AddSymbol(SymbolType symbol) {
+  std::size_t AddSymbol(SymbolType symbol) {
     MutateCheck();
     return impl_->AddSymbol(symbol);
   }
 
   // Returns the current available key (i.e., highest key + 1) in the symbol
   // table.
-  int64 AvailableKey() const { return impl_->AvailableKey(); }
+  std::size_t AvailableKey() const { return impl_->AvailableKey(); }
 
   // Return the label-agnostic MD5 check-sum for this table. All new symbols
   // added to the table will result in an updated checksum. Deprecated.
   const std::string &CheckSum() const { return impl_->CheckSum(); }
 
-  int64 GetNthKey(ssize_t pos) const { return impl_->GetNthKey(pos); }
+  std::size_t GetNthKey(size_t pos) const { return impl_->GetNthKey(pos); }
 
   // Returns the string associated with the key; if the key is out of
   // range (<0, >max), returns an empty string.
-  std::string Find(int64 key) const { return impl_->Find(key); }
+  std::string Find(std::size_t key) const { return impl_->Find(key); }
 
   // Returns the key associated with the symbol; if the symbol does not exist,
   // kNoSymbol is returned.
-  int64 Find(SymbolType symbol) const { return impl_->Find(symbol); }
+  std::size_t Find(SymbolType symbol) const { return impl_->Find(symbol); }
 
   // Same as CheckSum(), but returns an label-dependent version.
   const std::string &LabeledCheckSum() const {
     return impl_->LabeledCheckSum();
   }
 
-  bool Member(int64 key) const { return impl_->Member(key); }
+  bool Member(std::size_t key) const { return impl_->Member(key); }
 
   bool Member(SymbolType symbol) const { return impl_->Member(symbol); }
 
@@ -418,7 +419,7 @@ class SymbolTable {
   // AvailableKey()).
   size_t NumSymbols() const { return impl_->NumSymbols(); }
 
-  void RemoveSymbol(int64 key) {
+  void RemoveSymbol(std::size_t key) {
     MutateCheck();
     return impl_->RemoveSymbol(key);
   }
@@ -480,7 +481,7 @@ class SymbolTableIteratorItem {
       : table_(table), key_(table.GetNthKey(pos)) {}
 
   // Return the label of the current symbol.
-  int64 Label() const { return key_; }
+  std::size_t Label() const { return key_; }
 
   // Return the string of the current symbol.
   // TODO(wolfsonkin): Consider adding caching
@@ -492,7 +493,7 @@ class SymbolTableIteratorItem {
 
   friend class fst::SymbolTableIterator;
   const SymbolTable &table_;
-  int64 key_;
+  std::size_t key_;
 };
 
 }  // namespace internal
@@ -515,7 +516,7 @@ class SymbolTableIterator {
   bool Done() const { return (pos_ == nsymbols_); }
 
   // Return the key of the current symbol.
-  int64 Value() const { return iter_item_.Label(); }
+  std::size_t Value() const { return iter_item_.Label(); }
 
   // Return the string of the current symbol.
   std::string Symbol() const { return iter_item_.Symbol(); }
@@ -523,6 +524,7 @@ class SymbolTableIterator {
   // Advances iterator.
   void Next() {
     ++pos_;
+    CHECK_NE(pos_, kNoSymbol); //PTZ191116 do not want to loop?
     if (pos_ < nsymbols_) iter_item_.SetPosition(pos_);
   }
 
@@ -560,7 +562,7 @@ class SymbolTableIterator {
       : pos_(pos), nsymbols_(table.NumSymbols()), iter_item_(table, pos) {}
   friend class SymbolTable;
 
-  ssize_t pos_;
+  size_t pos_;
   size_t nsymbols_;
   value_type iter_item_;
 };

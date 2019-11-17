@@ -31,14 +31,14 @@ const int kLineLen = 8096;
 // Identifies stream data as a symbol table (and its endianity).
 static constexpr int32 kSymbolTableMagicNumber = 2125658996;
 
-constexpr int64 DenseSymbolMap::kEmptyBucket;
+  //PTZ191116 constexpr int64 DenseSymbolMap::kEmptyBucket;
 
 DenseSymbolMap::DenseSymbolMap()
     : str_hash_(),
       buckets_(1 << 4, kEmptyBucket),
       hash_mask_(buckets_.size() - 1) {}
 
-std::pair<int64, bool> DenseSymbolMap::InsertOrFind(KeyType key) {
+std::pair<std::size_t, bool> DenseSymbolMap::InsertOrFind(KeyType key) {
   static constexpr float kMaxOccupancyRatio = 0.75;  // Grows when 75% full.
   if (Size() >= kMaxOccupancyRatio * buckets_.size()) {
     Rehash(buckets_.size() * 2);
@@ -55,7 +55,7 @@ std::pair<int64, bool> DenseSymbolMap::InsertOrFind(KeyType key) {
   return {next, true};
 }
 
-int64 DenseSymbolMap::Find(KeyType key) const {
+std::size_t DenseSymbolMap::Find(KeyType key) const {
   size_t idx = str_hash_(key) & hash_mask_;
   while (buckets_[idx] != kEmptyBucket) {
     const auto stored_value = buckets_[idx];
@@ -98,16 +98,16 @@ std::unique_ptr<SymbolTableImplBase> ConstSymbolTableImpl::Copy() const {
   return nullptr;
 }
 
-int64 ConstSymbolTableImpl::AddSymbol(SymbolType symbol, int64 key) {
+std::size_t ConstSymbolTableImpl::AddSymbol(SymbolType symbol, std::size_t key) {
   LOG(FATAL) << "ConstSymbolTableImpl does not support AddSymbol";
   return kNoSymbol;
 }
 
-int64 ConstSymbolTableImpl::AddSymbol(SymbolType symbol) {
+std::size_t ConstSymbolTableImpl::AddSymbol(SymbolType symbol) {
   return AddSymbol(symbol, kNoSymbol);
 }
 
-void ConstSymbolTableImpl::RemoveSymbol(int64 key) {
+void ConstSymbolTableImpl::RemoveSymbol(std::size_t key) {
   LOG(FATAL) << "ConstSymbolTableImpl does not support RemoveSymbol";
 }
 
@@ -123,7 +123,7 @@ SymbolTableImpl *SymbolTableImpl::ReadText(std::istream &strm,
                                            const std::string &source,
                                            const SymbolTableTextOptions &opts) {
   std::unique_ptr<SymbolTableImpl> impl(new SymbolTableImpl(source));
-  int64 nline = 0;
+  std::size_t nline = 0;
   char line[kLineLen];
   while (!strm.getline(line, kLineLen).fail()) {
     ++nline;
@@ -173,14 +173,15 @@ void SymbolTableImpl::MaybeRecomputeCheckSum() const {
     check_sum.Update("", 1);
   }
   check_sum_string_ = check_sum.Digest();
+  CHECK_NE(dense_key_limit_, kNoSymbol); //PTZ191116
   // Calculates the safer, label-dependent checksum.
   CheckSummer labeled_check_sum;
-  for (int64 i = 0; i < dense_key_limit_; ++i) {
+  for (std::size_t i = 0; i < dense_key_limit_; ++i) {
     std::ostringstream line;
     line << symbols_.GetSymbol(i) << '\t' << i;
     labeled_check_sum.Update(line.str().data(), line.str().size());
   }
-  using citer = std::map<int64, int64>::const_iterator;
+  using citer = std::map<std::size_t, std::size_t>::const_iterator;
   for (citer it = key_map_.begin(); it != key_map_.end(); ++it) {
     // TODO(tombagby, 2013-11-22) This line maintains a bug that ignores
     // negative labels in the checksum that too many tests rely on.
@@ -193,18 +194,20 @@ void SymbolTableImpl::MaybeRecomputeCheckSum() const {
   check_sum_finalized_ = true;
 }
 
-std::string SymbolTableImpl::Find(int64 key) const {
-  int64 idx = key;
-  if (key < 0 || key >= dense_key_limit_) {
+std::string SymbolTableImpl::Find(std::size_t key) const {
+  auto idx = key;
+  //PTZ191116 (-1 < 0)
+  if (key ==  kNoSymbol || key >= dense_key_limit_) {
     const auto it = key_map_.find(key);
     if (it == key_map_.end()) return "";
     idx = it->second;
   }
-  if (idx < 0 || idx >= symbols_.Size()) return "";
+  //PTZ191116 (-1 < 0)
+  if (idx == kNoSymbol || idx >= symbols_.Size()) return "";
   return symbols_.GetSymbol(idx);
 }
 
-int64 SymbolTableImpl::AddSymbol(SymbolType symbol, int64 key) {
+std::size_t SymbolTableImpl::AddSymbol(SymbolType symbol, std::size_t key) {
   if (key == kNoSymbol) return key;
   const auto insert_key = symbols_.InsertOrFind(symbol);
   if (!insert_key.second) {
@@ -215,7 +218,7 @@ int64 SymbolTableImpl::AddSymbol(SymbolType symbol, int64 key) {
             << " but supplied new key = " << key << " (ignoring new key)";
     return key_already;
   }
-  if (key + 1 == static_cast<int64>(symbols_.Size()) &&
+  if (key + 1 == static_cast<std::size_t>(symbols_.Size()) &&
       key == dense_key_limit_) {
     ++dense_key_limit_;
   } else {
@@ -229,33 +232,36 @@ int64 SymbolTableImpl::AddSymbol(SymbolType symbol, int64 key) {
 
 // TODO(rybach): Consider a more efficient implementation which re-uses holes in
 // the dense-key range or re-arranges the dense-key range from time to time.
-void SymbolTableImpl::RemoveSymbol(const int64 key) {
+void SymbolTableImpl::RemoveSymbol(const std::size_t key) {
   auto idx = key;
-  if (key < 0 || key >= dense_key_limit_) {
+  //PTZ191116 (-1 < 0)
+  if (key == kNoSymbol || key >= dense_key_limit_) {
     auto iter = key_map_.find(key);
     if (iter == key_map_.end()) return;
     idx = iter->second;
     key_map_.erase(iter);
   }
-  if (idx < 0 || idx >= static_cast<int64>(symbols_.Size())) return;
+  //PTZ191116 (-1 < 0) or (idx - kNoSymbol) < (- kNoSymbol)
+  if (idx == kNoSymbol || idx >= static_cast<std::size_t>(symbols_.Size())) return;
   symbols_.RemoveSymbol(idx);
   // Removed one symbol, all indexes > idx are shifted by -1.
   for (auto &k : key_map_) {
     if (k.second > idx) --k.second;
   }
-  if (key >= 0 && key < dense_key_limit_) {
+  CHECK_NE(dense_key_limit_, kNoSymbol); //PTZ191116
+  if (key != kNoSymbol && key < dense_key_limit_) {
     // Removal puts a hole in the dense key range. Adjusts range to [0, key).
     const auto new_dense_key_limit = key;
-    for (int64 i = key + 1; i < dense_key_limit_; ++i) {
+    for (std::size_t i = key + 1; i < dense_key_limit_; ++i) {
       key_map_[i] = i - 1;
     }
     // Moves existing values in idx_key to new place.
     idx_key_.resize(symbols_.Size() - new_dense_key_limit);
-    for (int64 i = symbols_.Size(); i >= dense_key_limit_; --i) {
+    for (std::size_t i = symbols_.Size(); i >= dense_key_limit_; --i) {
       idx_key_[i - new_dense_key_limit - 1] = idx_key_[i - dense_key_limit_];
     }
     // Adds indexes for previously dense keys.
-    for (int64 i = new_dense_key_limit; i < dense_key_limit_ - 1; ++i) {
+    for (std::size_t i = new_dense_key_limit; i < dense_key_limit_ - 1; ++i) {
       idx_key_[i - new_dense_key_limit] = i + 1;
     }
     dense_key_limit_ = new_dense_key_limit;
@@ -281,16 +287,16 @@ SymbolTableImpl *SymbolTableImpl::Read(std::istream &strm,
   ReadType(strm, &name);
   std::unique_ptr<SymbolTableImpl> impl(new SymbolTableImpl(name));
   ReadType(strm, &impl->available_key_);
-  int64 size;
+  std::size_t size;
   ReadType(strm, &size);
   if (strm.fail()) {
     LOG(ERROR) << "SymbolTable::Read: Read failed";
     return nullptr;
   }
   std::string symbol;
-  int64 key;
+  std::size_t key;
   impl->check_sum_finalized_ = false;
-  for (int64 i = 0; i < size; ++i) {
+  for (std::size_t i = 0; i < size; ++i) {
     ReadType(strm, &symbol);
     ReadType(strm, &key);
     if (strm.fail()) {
@@ -307,9 +313,10 @@ bool SymbolTableImpl::Write(std::ostream &strm) const {
   WriteType(strm, kSymbolTableMagicNumber);
   WriteType(strm, name_);
   WriteType(strm, available_key_);
-  const int64 size = symbols_.Size();
+  const std::size_t size = symbols_.Size();
   WriteType(strm, size);
-  for (int64 i = 0; i < dense_key_limit_; ++i) {
+  CHECK_NE(dense_key_limit_, kNoSymbol); //PTZ191116
+  for (std::size_t i = 0; i < dense_key_limit_; ++i) {
     WriteType(strm, symbols_.GetSymbol(i));
     WriteType(strm, i);
   }
