@@ -194,12 +194,7 @@ class CompactHashBiTable {
     explicit HashFunc(const CompactHashBiTable &ht) : ht_(&ht) {}
 
     size_t operator()(I k) const {
-      ////PTZ191115 U ]-1 .. -1] are no forbiden states !
-      if (1 || (k + 1) >= 0 && k <  kCurrentKey) {
         return (*ht_->hash_func_)(ht_->Key2Entry(k));
-      } else {
-        return 0;
-      }
     }
 
    private:
@@ -213,16 +208,8 @@ class CompactHashBiTable {
     bool operator()(I k1, I k2) const {
       if (k1 == k2) {
         return true;
-      } else if (1 || //PTZ191115 U ]-1 .. -1] are no forbiden states
-		 (k1 + 1) >= 0
-		 && (k2 + 1) >= 0
-		 && k1 < kCurrentKey
-		 && k2 < kCurrentKey
-		 ) {
-        return (*ht_->hash_equal_)(ht_->Key2Entry(k1), ht_->Key2Entry(k2));
-      } else {
-        return false;
       }
+      return (*ht_->hash_equal_)(ht_->Key2Entry(k1), ht_->Key2Entry(k2));
     }
 
    private:
@@ -375,7 +362,9 @@ class VectorHashBiTable {
     explicit HashFunc(const VectorHashBiTable &ht) : ht_(&ht) {}
 
     size_t operator()(I k) const {
-      if (k >= kCurrentKey) {
+      if (k != kEmptyKey) {     //TODO:PTZ191117
+	//(s_ == kNoStateId) forbiden ?
+	//CHECK_NE(k, kNoStateId);
         return (*(ht_->h_))(ht_->Key2Entry(k));
       } else {
         return 0;
@@ -391,7 +380,7 @@ class VectorHashBiTable {
     explicit HashEqual(const VectorHashBiTable &ht) : ht_(&ht) {}
 
     bool operator()(I k1, I k2) const {
-      if (k1 >= kCurrentKey && k2 >= kCurrentKey) {
+      if (k1 != kCurrentKey && k2 != kCurrentKey) {
         return ht_->Key2Entry(k1) == ht_->Key2Entry(k2);
       } else {
         return k1 == k2;
