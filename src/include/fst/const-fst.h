@@ -333,7 +333,8 @@ bool ConstFst<Arc, Unsigned>::WriteFst(const FST &fst, std::ostream &strm,
     num_arcs = impl->narcs_;
     num_states = impl->nstates_;
     update_header = false;
-  } else if (opts.stream_write || (start_offset = strm.tellp()) == (size_t)-1) {
+  } else if (opts.stream_write
+	     || (start_offset = strm.tellp()) == static_cast<std::streamoff>(-1)) {
     // precompute values needed for header when we cannot seek to rewrite it.
     num_arcs = 0;
     num_states = 0;
@@ -425,7 +426,11 @@ class StateIterator<ConstFst<Arc, Unsigned>> {
   explicit StateIterator(const ConstFst<Arc, Unsigned> &fst)
       : nstates_(fst.GetImpl()->NumStates()), s_(0) {}
 
-  bool Done() const { return s_ >= nstates_; }
+  bool Done() const {
+    //PTZ191117 (s_ == kNoStateId) forbiden
+    CHECK_NE(nstates_, kNoStateId);
+    return (s_ != kNoStateId) && (s_ >= nstates_);
+  }
 
   StateId Value() const { return s_; }
 
@@ -450,7 +455,11 @@ class ArcIterator<ConstFst<Arc, Unsigned>> {
         narcs_(fst.GetImpl()->NumArcs(s)),
         i_(0) {}
 
-  bool Done() const { return i_ >= narcs_; }
+  bool Done() const {
+    //PTZ191117 (narcs_ == kNoStateId) forbiden
+    CHECK_NE(narcs_, kNoStateId);
+    return (i_ != kNoStateId) && (i_ >= narcs_);
+  }
 
   const Arc &Value() const { return arcs_[i_]; }
 
